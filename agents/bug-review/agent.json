@@ -1,0 +1,12 @@
+{
+  "id": "bug-review",
+  "title": "Bug review",
+  "check": "Pitcrew / Bug Review",
+  "command": "/review",
+  "description": "Reads a pull request diff and reports defects it can prove.",
+  "profile": "read-only-no-shell",
+  "report": "findings",
+  "inputs": ["diff"],
+  "temperature": 0.1,
+  "modelVariable": "PITCREW_MODEL_BUG_REVIEW"
+}

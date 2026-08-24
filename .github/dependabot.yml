@@ -1,0 +1,19 @@
+version: 2
+
+# Only github-actions. There are no npm dependencies and none are wanted (see
+# package.json), so there is no npm ecosystem to watch. Third-party actions here
+# are pinned to commit shas, which is exactly the case that needs a bot to
+# notice a new release.
+#
+# Three directories, not one: Dependabot finds `.github/workflows/` from the
+# root, but a composite action's `action.yml` in a subdirectory is only scanned
+# if that directory is listed. Both of ours pin third-party actions, and one of
+# them pins the action that runs with the model key in its environment.
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /actions/agent
+      - /actions/check-deployment
+    schedule:
+      interval: weekly

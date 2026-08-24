@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in a Pitcrew run did not behave as documented.
+labels: [bug]
+body:
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which agent
+      options:
+        - bug-review
+        - security-review
+        - acceptance-test
+        - The package itself (release, action, docs)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version pinned
+      description: The ref in your `uses:` line - `@v1`, an exact tag, or a commit sha.
+      placeholder: RobYed/pr-pitcrew/.github/workflows/bug-review.yml@v1
+    validations:
+      required: true
+
+  - type: input
+    id: run
+    attributes:
+      label: Link to the run
+      description: If your repository is public. Leave empty otherwise and paste the relevant log lines below.
+
+  - type: input
+    id: model
+    attributes:
+      label: Model and provider
+      description: Names only. Never paste an API key, and check that no log line you paste contains one.
+      placeholder: gpt-4o-mini via api.example.com
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Your workflow file
+      description: The calling workflow, with secrets removed.
+      render: yaml

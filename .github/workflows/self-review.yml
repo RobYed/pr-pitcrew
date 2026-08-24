@@ -1,0 +1,40 @@
+name: Self review
+
+# The package reviews its own pull requests with its own agents.
+#
+# That is worth more than it sounds. If installing this is awkward here, it is
+# awkward everywhere, and the person who notices is the one who can fix it. It
+# is also the only place where a change to a prompt or a permission profile is
+# tried on real code before anybody else gets it.
+#
+# One honest limitation: a called workflow's `uses:` cannot be an expression, so
+# `bug-review.yml` reaches for `RobYed/pr-pitcrew/actions/agent@main` - the
+# action as it is on the default branch, not as this pull request changes it.
+# A pull request that touches `actions/agent/action.yml` is therefore reviewed
+# by the old action. See CONTRIBUTING.md, "Changing the action itself".
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: self-review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'push' }}
+  cancel-in-progress: true
+
+jobs:
+  bug:
+    uses: ./.github/workflows/bug-review.yml
+    secrets:
+      api-key: ${{ secrets.PITCREW_API_KEY }}
+
+  security:
+    uses: ./.github/workflows/security-review.yml
+    secrets:
+      api-key: ${{ secrets.PITCREW_API_KEY }}

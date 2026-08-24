@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+
+# The agents' working directory. Consumers do not need this line - the action
+# writes it into their `.git/info/exclude` instead, which is repo-local and
+# never committed. Here it is checked in because this repository is also the
+# one that runs the agents on itself.
+.pitcrew-run/

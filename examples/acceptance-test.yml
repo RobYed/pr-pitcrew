@@ -1,0 +1,46 @@
+# Copy this into your repository as `.github/workflows/pitcrew-acceptance-test.yml`.
+#
+# This one costs more than the other two - a browser, a container, up to half an
+# hour, and real operations against a real environment - so it does not start
+# itself. It starts when somebody requests a review from the account in
+# `PITCREW_ACCEPTANCE_REVIEWER`, which is the same gesture a human reviewer gets.
+#
+# Required beforehand, in addition to the endpoint, key and model:
+#   variable PITCREW_TARGET_URL             the deployed app to drive
+#   variable PITCREW_ACCEPTANCE_REVIEWER    login of the account whose review request starts a run
+#
+# Optional:
+#   variable PITCREW_TARGET_HEALTH_URL      an endpoint naming the deployed commit
+#   secret   PITCREW_TARGET_USERNAME        credentials for the app, if it needs an account
+#   secret   PITCREW_TARGET_PASSWORD
+#
+# The reviewer account is an ordinary GitHub user (a machine account is enough)
+# with read access to the repository. Do **not** put it in CODEOWNERS: GitHub
+# would then request it on every pull request and the walk-through would run by
+# itself again, which is the one thing this trigger exists to prevent.
+
+name: Acceptance Test
+
+on:
+  pull_request:
+    types: [review_requested]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+  issues: write
+
+concurrency:
+  group: acceptance-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || github.event.requested_reviewer.login || github.event.requested_team.slug || 'push' }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance-test:
+    uses: RobYed/pr-pitcrew/.github/workflows/acceptance-test.yml@v1
+    secrets:
+      api-key: ${{ secrets.PITCREW_API_KEY }}
+      target-username: ${{ secrets.PITCREW_TARGET_USERNAME }}
+      target-password: ${{ secrets.PITCREW_TARGET_PASSWORD }}

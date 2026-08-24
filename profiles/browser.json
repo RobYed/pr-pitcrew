@@ -1,0 +1,24 @@
+{
+  "$comment": "For an agent that drives a real browser. It has a shell, because it runs Node, and denying `curl` while allowing `node` would be a boundary in name only. Everything that depends on the shell-less profile therefore does not hold here: see docs/threat-model.md, 'The acceptance agent keeps its shell'.",
+  "bash": {
+    "*": "allow",
+    "git commit*": "deny",
+    "git push*": "deny"
+  },
+  "read": {
+    "*": "allow",
+    "/proc/**": "deny",
+    "/sys/**": "deny",
+    ".git/**": "deny",
+    "**/.git/**": "deny"
+  },
+  "edit": {
+    "*": "deny",
+    ".pitcrew-run/**": "allow",
+    "**/.pitcrew-run/**": "allow"
+  },
+  "webfetch": "deny",
+  "websearch": "deny",
+  "write_report": "allow",
+  "external_directory": "deny"
+}

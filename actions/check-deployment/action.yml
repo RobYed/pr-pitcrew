@@ -1,0 +1,99 @@
+name: Check the deployment identity
+description: Refuses to demonstrate an environment that is serving somebody else's commit.
+
+# A preview environment that every pull request shares can be taken over by the
+# next one mid-run. If the deployment can say which commit it is serving, that
+# is worth two seconds to check - a walk-through of somebody else's branch would
+# be indistinguishable from a passing one, on video, with a green check.
+#
+# Without a health URL this is a no-op that says so. Not knowing is not the same
+# as knowing the wrong thing, and refusing a run over a missing convenience
+# would cost more than it buys.
+
+inputs:
+  health-url:
+    description: An endpoint whose response contains the deployed commit sha. Optional.
+    required: false
+    default: ''
+  github-token:
+    description: Token used to look the pull request's commits up.
+    required: true
+  pr-number:
+    description: The pull request whose commits should be on the deployment.
+    required: true
+  attempts:
+    description: How many times to ask before giving up.
+    required: false
+    default: '3'
+  interval-seconds:
+    description: How long to wait between attempts.
+    required: false
+    default: '20'
+
+runs:
+  using: composite
+  steps:
+    # Looked up rather than read from the event, because an `/acceptance`
+    # comment carries neither commit: an `issue_comment` knows the issue, not
+    # the branch behind it.
+    - name: Resolve the pull request's commits
+      id: commits
+      if: inputs.health-url != ''
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+      run: node "$GITHUB_ACTION_PATH/../../scripts/resolve-commits.mjs"
+
+    - name: Ask the deployment which commit it is serving
+      shell: bash
+      env:
+        HEALTH_URL: ${{ inputs.health-url }}
+        # Both, and not `github.sha` alone: a preview built by a `pull_request`
+        # workflow reports the test merge commit, so the head never matches on
+        # its own. `github.sha` is that merge commit only for the same event -
+        # on an `/acceptance` rerun it is the default branch's tip, which would
+        # match a deployment of anything.
+        HEAD_SHA: ${{ steps.commits.outputs.head-sha }}
+        MERGE_SHA: ${{ steps.commits.outputs.merge-sha }}
+        ATTEMPTS: ${{ inputs.attempts }}
+        INTERVAL: ${{ inputs.interval-seconds }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "$HEALTH_URL" ]; then
+          echo 'No health URL is configured, so the deployed commit cannot be verified. Continuing.'
+          echo 'The deployed commit was not verified: no health URL is configured.' >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        # Not knowing which commit to look for is the same situation as having
+        # nothing to ask: unverified, not refused. Without this the loop below
+        # matches neither empty sha and ends in the takeover error - which would
+        # fail the run, publish no report, and name a cause that never happened.
+        if [ -z "$HEAD_SHA" ] && [ -z "$MERGE_SHA" ]; then
+          echo 'Neither commit of this pull request could be read, so the deployed commit cannot be verified. Continuing.'
+          echo 'The deployed commit was not verified: the pull request could not be read.' >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        attempt=1
+        while [ "$attempt" -le "$ATTEMPTS" ]; do
+          body="$(curl -fsS --max-time 20 "$HEALTH_URL" || true)"
+          for sha in "$HEAD_SHA" "$MERGE_SHA"; do
+            [ -z "$sha" ] && continue
+            if printf '%s' "$body" | grep -qF "${sha:0:7}"; then
+              echo "The deployment reports ${sha:0:7}."
+              exit 0
+            fi
+          done
+          echo "Attempt $attempt: the deployment does not report this commit yet."
+          # An `if`, not `[ ... ] && sleep`: as the last command in the loop body
+          # a failing test would end the step under `set -e`, before the error
+          # message below ever gets printed.
+          if [ "$attempt" -lt "$ATTEMPTS" ]; then sleep "$INTERVAL"; fi
+          attempt=$((attempt + 1))
+        done
+
+        echo "::error::$HEALTH_URL does not report this pull request's commit. Another deployment has taken the environment over, so nothing demonstrated here would be about this change."
+        exit 1

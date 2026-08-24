@@ -1,0 +1,12 @@
+{
+  "id": "security-review",
+  "title": "Security review",
+  "check": "Pitcrew / Security Review",
+  "command": "/security",
+  "description": "Reads a pull request diff and reports security defects it can prove.",
+  "profile": "read-only-no-shell",
+  "report": "findings",
+  "inputs": ["diff"],
+  "temperature": 0.1,
+  "modelVariable": "PITCREW_MODEL_SECURITY_REVIEW"
+}

@@ -1,0 +1,21 @@
+{
+  "$comment": "A permission profile. Named once, referenced by agents, and shipped with the package so a pull request cannot loosen the permissions of the agent that reviews it. See docs/threat-model.md.",
+  "bash": "deny",
+  "read": {
+    "*": "allow",
+    "/proc/**": "deny",
+    "/sys/**": "deny",
+    ".git/**": "deny",
+    "**/.git/**": "deny"
+  },
+  "edit": {
+    "*": "deny",
+    ".pitcrew-run/**": "allow",
+    "**/.pitcrew-run/**": "allow"
+  },
+  "webfetch": "deny",
+  "websearch": "deny",
+  "task": "deny",
+  "write_report": "allow",
+  "external_directory": "deny"
+}

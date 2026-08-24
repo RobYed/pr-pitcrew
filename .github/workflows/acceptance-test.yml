@@ -1,0 +1,190 @@
+name: Pitcrew Acceptance Test
+
+# Proves in a browser that a pull request does what its issue asked for, and
+# records the walk-through on video.
+#
+# **It does not start itself.** A walk-through against an unfinished change
+# costs real quota in a real environment, and a push is not a signal that
+# anything is ready to be shown. The signal is the same one a human reviewer
+# gets: somebody requests a review from the account in
+# `PITCREW_ACCEPTANCE_REVIEWER`. That fires `review_requested`, which is still a
+# `pull_request` event - the runtime rejects `workflow_run`.
+#
+# Requesting the same reviewer again is a second run. GitHub will not request a
+# reviewer who is already pending, so that means removing them and adding them
+# back - or, once they have submitted a review, using re-request. `/acceptance`
+# on a comment does the same, and is the fallback when the variable is unset. A
+# draft blocks neither: both are an explicit ask.
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: Model id. Defaults to PITCREW_MODEL_ACCEPTANCE_TEST, then PITCREW_MODEL.
+        type: string
+        required: false
+        default: ''
+      api-base-url:
+        description: OpenAI-compatible endpoint. Defaults to the variable PITCREW_API_BASE_URL.
+        type: string
+        required: false
+        default: ''
+      target-url:
+        description: The deployed application to drive. Defaults to the variable PITCREW_TARGET_URL.
+        type: string
+        required: false
+        default: ''
+      target-health-url:
+        description: >-
+          An endpoint whose response names the deployed commit. When set, the run
+          refuses to demonstrate somebody else's deployment. Defaults to the
+          variable PITCREW_TARGET_HEALTH_URL.
+        type: string
+        required: false
+        default: ''
+      output-language:
+        description: Language the agent writes in. Defaults to English.
+        type: string
+        required: false
+        default: ''
+      playwright-image:
+        description: Container image with browsers, their libraries and the video encoder.
+        type: string
+        required: false
+        default: mcr.microsoft.com/playwright:v1.62.1-noble
+      timeout-minutes:
+        type: number
+        required: false
+        default: 30
+    secrets:
+      api-key:
+        description: Key for the OpenAI-compatible endpoint.
+        required: true
+      target-username:
+        description: Username or e-mail for the application under test, if it needs an account.
+        required: false
+      target-password:
+        description: Password for the application under test.
+        required: false
+      app-private-key:
+        description: Private key of your GitHub App, to comment under your own name.
+        required: false
+
+# Concurrency is evaluated when the run is queued, before the job's `if:` may
+# skip it, so the group has to be unique for events that must not cancel a run
+# in flight:
+#
+#  * A comment carries its own id, otherwise every comment on the pull request
+#    would kill the walk-through and then skip itself.
+#  * A review request carries the requested login (or team slug). Requesting a
+#    *different* reviewer is a `review_requested` this job skips; without that
+#    login in the key it would still cancel the run. Requesting *this* reviewer
+#    again shares the group, so remove-and-re-add supersedes the run going.
+concurrency:
+  group: pitcrew-acceptance-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || github.event.requested_reviewer.login || github.event.requested_team.slug || 'push' }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: Pitcrew / Acceptance Test
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'review_requested' &&
+       vars.PITCREW_ACCEPTANCE_REVIEWER != '' &&
+       (github.event.requested_reviewer.login == vars.PITCREW_ACCEPTANCE_REVIEWER ||
+        github.event.requested_reviewer.login == format('{0}[bot]', vars.PITCREW_ACCEPTANCE_REVIEWER) ||
+        format('{0}[bot]', github.event.requested_reviewer.login) == vars.PITCREW_ACCEPTANCE_REVIEWER ||
+        github.event.requested_team.slug == vars.PITCREW_ACCEPTANCE_REVIEWER ||
+        github.event.requested_team.name == vars.PITCREW_ACCEPTANCE_REVIEWER)) ||
+      (github.event_name == 'pull_request' &&
+       github.event.action != 'review_requested' &&
+       github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       github.event.comment.user.type != 'Bot' &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
+       contains(github.event.comment.body, '/acceptance'))
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+      pull-requests: write
+      # So the published comment can carry a download link to the artifact this
+      # run uploads: the artifact id only exists after the upload and is only
+      # readable through the Actions API.
+      actions: read
+      issues: write
+
+    # Browsers, their system libraries and the video encoder are baked into this
+    # image. Installing Playwright per run would download the same few hundred
+    # megabytes every time and can break on an apt mirror having a bad day.
+    container:
+      image: ${{ inputs.playwright-image }}
+      options: --user root
+
+    # A container job defaults to `sh`, not to the runner's bash. Without this
+    # the first `set -o pipefail` ends a step with "Illegal option".
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # The one thing the image lacks that the OpenCode installer needs.
+      - name: Add unzip
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends unzip
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      # This agent has a shell, the model key and the credentials of the
+      # environment under test - and the runtime puts the pull request's title,
+      # body and comments into its prompt. In a private repository only people
+      # who can already push are able to write those. In a public one anybody
+      # with a GitHub account can, and their words would reach that shell.
+      #
+      # The two diff reviews are unaffected and keep running in public
+      # repositories: no shell, no `webfetch`, no `task`, and no way to read the
+      # process environment, so hostile text has nowhere to take anything.
+      - name: Refuse a public repository
+        if: github.event.repository.private == false && vars.PITCREW_ALLOW_PUBLIC_ACCEPTANCE != 'true'
+        run: |
+          echo '::error::This repository is public, so anyone can comment on a pull request - and those comments reach an agent that has a shell and the credentials of the environment under test. The acceptance test therefore does not run here. Set the repository variable PITCREW_ALLOW_PUBLIC_ACCEPTANCE to true only if you have understood that and accept it. See docs/threat-model.md.'
+          exit 1
+
+      # A preview environment that every pull request shares can be taken over by
+      # the next one mid-run. If the deployment can say which commit it is
+      # serving, that is worth two seconds: a demonstration of somebody else's
+      # branch would be indistinguishable from a passing one.
+      #
+      # Both commits, looked up rather than read from the event, because an
+      # `/acceptance` comment carries neither: an `issue_comment` knows the
+      # issue, not the branch behind it.
+      - uses: RobYed/pr-pitcrew/actions/check-deployment@main
+        with:
+          health-url: ${{ inputs.target-health-url || vars.PITCREW_TARGET_HEALTH_URL }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number || github.event.issue.number }}
+
+      - uses: RobYed/pr-pitcrew/actions/agent@main
+        with:
+          agent: acceptance-test
+          api-key: ${{ secrets.api-key }}
+          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_API_BASE_URL }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          app-id: ${{ vars.PITCREW_APP_ID }}
+          app-private-key: ${{ secrets.app-private-key }}
+          model: ${{ inputs.model || vars.PITCREW_MODEL_ACCEPTANCE_TEST || vars.PITCREW_MODEL }}
+          target-url: ${{ inputs.target-url || vars.PITCREW_TARGET_URL }}
+          target-username: ${{ secrets.target-username }}
+          target-password: ${{ secrets.target-password }}
+          output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}
+          artifact-name: acceptance-proof
+          artifact-label: Video and screenshots
+          # No severity gate here, and not for want of one: this agent reports
+          # criteria, not findings, so there is no severity to hold against a
+          # threshold. Whether an unmet criterion should be a red check is a
+          # different question from the one the reviews answer, and not one this
+          # package answers quietly on somebody's behalf. The verdict and the
+          # table are on the pull request; a person reads them.
+          fail-on: never

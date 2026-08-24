@@ -1,0 +1,12 @@
+{
+  "id": "acceptance-test",
+  "title": "Acceptance test",
+  "check": "Pitcrew / Acceptance Test",
+  "command": "/acceptance",
+  "description": "Drives the deployed app in a browser and proves the acceptance criteria on video.",
+  "profile": "browser",
+  "report": "criteria",
+  "inputs": ["issue", "target"],
+  "temperature": 0.1,
+  "modelVariable": "PITCREW_MODEL_ACCEPTANCE_TEST"
+}

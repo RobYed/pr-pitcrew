@@ -1,0 +1,416 @@
+name: PR Pitcrew agent
+description: Runs one Pitcrew agent against a pull request and publishes what it found.
+
+# The engine. Everything a run does happens here, from the fork check to the
+# comment on the pull request; the reusable workflows above only decide *when*
+# a run starts and what it is allowed to touch.
+#
+# Four decisions are worth knowing before you change anything:
+#
+#  * **The configuration comes from this package, never from the repository
+#    under review.** The agent manifest, its permission profile and its prompt
+#    are read out of the checkout GitHub makes of *this* action, at the ref the
+#    consumer pinned. A pull request cannot grant its own reviewer a shell,
+#    because it has no say in the matter at all.
+#  * **The provider is an OpenAI-compatible endpoint, nothing more specific.**
+#    The endpoint arrives in `api-base-url`, the key in `api-key`, the model in
+#    `model`. None of them has a default: a repository that has not configured
+#    them stops with an error instead of falling back to something plausible
+#    and billable.
+#  * `use_github_token: true` keeps the OpenCode GitHub App and its OIDC token
+#    exchange out of the loop. The action accepts any token in GITHUB_TOKEN, so
+#    the same switch also lets a repository use its own GitHub App for a custom
+#    bot name (see `app-id`) without pulling a third-party service back in.
+#  * **The checkout that precedes this action must keep its credentials.**
+#    OpenCode fetches the pull request branch itself and, with
+#    `use_github_token`, installs none of its own; in a private repository that
+#    fetch would fail. `contents: read` on the job is what keeps that token
+#    from pushing.
+
+inputs:
+  agent:
+    description: Id of the agent to run - a directory under `agents/` in this package.
+    required: true
+  api-key:
+    description: API key of the OpenAI-compatible model provider.
+    required: true
+  api-base-url:
+    description: >-
+      Base URL of the OpenAI-compatible endpoint, including the version
+      segment - `https://api.example.com/v1`. Required; this package names no
+      endpoint.
+    required: true
+  model:
+    description: >-
+      Model id as the endpoint spells it, e.g. `gpt-4o-mini` or
+      `deepseek-ai/DeepSeek-V3`. Required, and deliberately without a default:
+      which model reviews your code is a decision you make with your provider,
+      not one this package makes for you.
+    required: true
+  github-token:
+    description: Token used when no GitHub App is configured. Comments then appear as github-actions[bot].
+    required: true
+  pr-number:
+    description: Pull request to work on. Defaults to the one in the triggering event.
+    required: false
+    default: ''
+  app-id:
+    description: >-
+      Optional GitHub App id. When set, an installation token is minted and every
+      comment carries that app's name and avatar instead of github-actions[bot].
+      The app needs Contents:read, Pull requests:write, Issues:write,
+      Metadata:read and Administration:read - the last one because OpenCode
+      verifies that the triggering user may write to the repository.
+    required: false
+    default: ''
+  app-private-key:
+    description: Private key belonging to `app-id`.
+    required: false
+    default: ''
+  fail-on:
+    description: >-
+      Severity from which findings fail the check: `high` (default), `medium`,
+      `low`, or `never` to keep the agent advisory.
+    required: false
+    default: ''
+  fail-on-no-report:
+    description: >-
+      `false` lets a run whose agent produced no usable report stay green.
+      Default: it fails, because a diff nobody reviewed is not a diff nobody
+      found anything in.
+    required: false
+    default: ''
+  target-url:
+    description: The deployed application an agent with a browser should drive.
+    required: false
+    default: ''
+  target-username:
+    description: Username or e-mail for the application under test, if it needs an account.
+    required: false
+    default: ''
+  target-password:
+    description: Password for the application under test.
+    required: false
+    default: ''
+  artifact-name:
+    description: >-
+      When set, everything the agent wrote to `$ARTIFACT_DIR` is uploaded under
+      this name and the summary comment carries a download link to it.
+    required: false
+    default: ''
+  artifact-label:
+    description: What that download link says. Defaults to the artifact name.
+    required: false
+    default: ''
+  artifact-retention-days:
+    description: How long the artifact is kept.
+    required: false
+    default: '30'
+  output-language:
+    description: >-
+      The language the agent writes its summary and findings in. The frame
+      around that text is English on every run, which is why English is the
+      default.
+    required: false
+    default: 'English'
+  opencode-version:
+    description: >-
+      Version of the OpenCode runtime to install. Pinned on purpose; see
+      docs/threat-model.md, "The supply chain".
+    required: false
+    default: '1.18.18'
+
+runs:
+  using: composite
+  steps:
+    - name: Mint a GitHub App token
+      id: app-token
+      if: inputs.app-id != ''
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.app-private-key }}
+
+    # `github.action_path` is where GitHub put its checkout of this package, at
+    # the ref the consumer pinned. Two levels up from `actions/agent/` is the
+    # package root, and that is where the manifests, the profiles, the prompts
+    # and the scripts live. Nothing below reads any of them from the workspace.
+    - name: Locate the package
+      id: home
+      shell: bash
+      run: |
+        set -euo pipefail
+        home="$(cd "$GITHUB_ACTION_PATH/../.." && pwd)"
+        for required in scripts/build-config.mjs agents profiles; do
+          if [ ! -e "$home/$required" ]; then
+            echo "::error::$home does not look like a PR Pitcrew checkout: $required is missing."
+            exit 1
+          fi
+        done
+        echo "home=$home" >> "$GITHUB_OUTPUT"
+        echo "PITCREW_HOME=$home" >> "$GITHUB_ENV"
+        echo "Package: $home"
+
+    - name: Read the agent manifest
+      id: manifest
+      shell: bash
+      env:
+        AGENT: ${{ inputs.agent }}
+      run: node "$PITCREW_HOME/scripts/read-manifest.mjs"
+
+    - name: Prepare the workspace
+      shell: bash
+      env:
+        WORK_ROOT: ${{ github.workspace }}/.pitcrew-run
+      run: |
+        set -euo pipefail
+
+        # Git refuses to work in a directory owned by another user, which is
+        # what a container job looks like from the inside. OpenCode runs git,
+        # so without this it stops here rather than at something informative.
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        # Everything the agent reads or writes lives here. It has to be *inside*
+        # the checkout, because a path outside needs the `external_directory`
+        # permission and an unanswered permission prompt in CI does not fail -
+        # it waits, until the job's timeout kills it. And it has to be
+        # *ignored*, because the OpenCode action commits and pushes whatever
+        # `git status --porcelain` reports.
+        #
+        # `.git/info/exclude` rather than a line in the consumer's `.gitignore`:
+        # repo-local, never committed, and one fewer installation step to forget.
+        # A forgotten one used to turn a review into a commit.
+        mkdir -p "$WORK_ROOT/proof" "$WORK_ROOT/scenario"
+        exclude="$GITHUB_WORKSPACE/.git/info/exclude"
+        if [ -d "$GITHUB_WORKSPACE/.git" ]; then
+          mkdir -p "$(dirname "$exclude")"
+          grep -qxF '.pitcrew-run/' "$exclude" 2>/dev/null || echo '.pitcrew-run/' >> "$exclude"
+        fi
+        if [ -n "$(git -C "$GITHUB_WORKSPACE" status --porcelain 2>/dev/null || true)" ]; then
+          echo '::warning::The working tree was already dirty before the agent started. The OpenCode runtime commits a dirty tree, so this is worth a look.'
+        fi
+
+        # The report tool has to live in OpenCode's own config directory, not in
+        # the checkout: OpenCode fetches the pull request branch after this
+        # step, so a copy under the workspace would come from the head branch -
+        # and a comment-triggered run would then be reviewing a stranger with a
+        # tool that stranger provided. `~/.config/opencode/tools/` is loaded
+        # regardless, and this copy comes from the package.
+        mkdir -p "$HOME/.config/opencode/tools"
+        cp "$PITCREW_HOME/scripts/write_report.js" "$HOME/.config/opencode/tools/write_report.js"
+
+        # OpenCode sets a git identity only inside its own configureGit(), which
+        # it skips when use_github_token is true. Without one, a dirty working
+        # tree ends the run with "Author identity unknown" instead of anything a
+        # reader could act on. The commit still cannot leave the runner - the
+        # job has contents: read.
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+    # First, before anything reads a diff. The `pull_request` trigger withholds
+    # repository secrets from a fork by itself; the comment triggers do not,
+    # because an `issue_comment` event always runs in the base repository with
+    # its secrets, whatever pull request it names. See docs/threat-model.md.
+    - name: Refuse forks
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number || github.event.issue.number }}
+      run: node "$PITCREW_HOME/scripts/assert-same-repo.mjs"
+
+    # The review agents have no shell at all, so the diff is put where their
+    # file tools can reach it. Fetched from the API rather than with `git diff`:
+    # in a comment-triggered run the checkout is still the default branch at
+    # this point, where that diff would come out empty.
+    - name: Fetch the diff
+      if: steps.manifest.outputs.wants-diff == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number || github.event.issue.number }}
+        DIFF_FILE: ${{ github.workspace }}/.pitcrew-run/pr.diff
+        # Empty on everything but a push, which is what makes the whole pull
+        # request the subject when a human asks for a review by comment.
+        BEFORE_SHA: ${{ github.event.before }}
+        AFTER_SHA: ${{ github.event.after }}
+      run: node "$PITCREW_HOME/scripts/fetch-diff.mjs"
+
+    # The agent gets the issue as a file rather than fetching it. `gh` is not in
+    # every runner image - it is not in the Playwright one - and an agent that
+    # has to fetch nothing needs fewer rights to do its job.
+    - name: Fetch the linked issue
+      if: steps.manifest.outputs.wants-issue == 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number || github.event.issue.number }}
+        ISSUE_FILE: ${{ github.workspace }}/.pitcrew-run/issue.md
+      run: node "$PITCREW_HOME/scripts/fetch-issue.mjs"
+
+    # Everything the agent needs goes through GITHUB_ENV rather than a step's
+    # `env:`, because it has to survive one more level of nesting: the OpenCode
+    # action is itself a composite action, and the agent's shell is a process
+    # inside it.
+    - name: Hand the agent its inputs
+      shell: bash
+      env:
+        TARGET_URL_IN: ${{ inputs.target-url }}
+        OUTPUT_LANGUAGE_IN: ${{ inputs.output-language }}
+        TARGET_USERNAME: ${{ inputs.target-username }}
+        TARGET_PASSWORD: ${{ inputs.target-password }}
+        WANTS_TARGET: ${{ steps.manifest.outputs.wants-target }}
+      run: |
+        set -euo pipefail
+
+        if [ "$WANTS_TARGET" = 'true' ] && [ -z "$TARGET_URL_IN" ]; then
+          echo '::error::This agent drives a deployed application, and no address was given. Set the repository variable PITCREW_TARGET_URL (or the workflow input `target-url`) to the environment it should test.'
+          exit 1
+        fi
+
+        {
+          echo "TARGET_URL=$TARGET_URL_IN"
+          echo "OUTPUT_LANGUAGE=${OUTPUT_LANGUAGE_IN:-English}"
+          echo "ARTIFACT_DIR=$GITHUB_WORKSPACE/.pitcrew-run/proof"
+          echo "WORK_DIR=$GITHUB_WORKSPACE/.pitcrew-run/scenario"
+          echo "RECORDER=$PITCREW_HOME/scripts/recorder.mjs"
+          echo "REPORT_FILE=$GITHUB_WORKSPACE/.pitcrew-run/report.json"
+          echo "RUN_URL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # Playwright lives outside the project in the Playwright image, where
+          # a bare `import` would not find it; recorder.mjs resolves this path.
+          echo "PLAYWRIGHT_MODULE=${PLAYWRIGHT_MODULE:-/ms-playwright-agent/node_modules/playwright-core}"
+        } >> "$GITHUB_ENV"
+
+        # Kept out of the block above so a stray newline in a secret cannot
+        # forge a variable assignment.
+        printf 'PITCREW_TARGET_USERNAME<<PITCREW_ENV_EOF\n%s\nPITCREW_ENV_EOF\n' "$TARGET_USERNAME" >> "$GITHUB_ENV"
+        printf 'PITCREW_TARGET_PASSWORD<<PITCREW_ENV_EOF\n%s\nPITCREW_ENV_EOF\n' "$TARGET_PASSWORD" >> "$GITHUB_ENV"
+
+    - name: Build the configuration and the prompt
+      id: config
+      shell: bash
+      env:
+        AGENT: ${{ inputs.agent }}
+        MODEL: ${{ inputs.model }}
+        BASE_URL: ${{ inputs.api-base-url }}
+        CONFIG_OUT: ${{ runner.temp }}/pitcrew-config.json
+        MODEL_OUT: ${{ runner.temp }}/pitcrew-model.txt
+        PROMPT_OUT: ${{ runner.temp }}/pitcrew-prompt.md
+        TITLE_OUT: ${{ runner.temp }}/pitcrew-title.txt
+      run: |
+        set -euo pipefail
+        node "$PITCREW_HOME/scripts/build-config.mjs"
+
+        echo "model=$(cat "$MODEL_OUT")" >> "$GITHUB_OUTPUT"
+        {
+          echo 'config<<PITCREW_CONFIG_EOF'
+          cat "$CONFIG_OUT"
+          echo
+          echo 'PITCREW_CONFIG_EOF'
+          echo 'prompt<<PITCREW_PROMPT_EOF'
+          cat "$PROMPT_OUT"
+          echo 'PITCREW_PROMPT_EOF'
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Run the agent
+      uses: anomalyco/opencode/github@2c14fc5586fe0b88e5c04732d2e846769cc35671 # latest
+      env:
+        # Endpoint and key reach OpenCode as environment variables rather than
+        # as configuration values, because the generated config refers to them
+        # as `{env:...}` and OpenCode substitutes them when it reads it. The key
+        # therefore never passes through a step output on its way here.
+        PITCREW_API_KEY: ${{ inputs.api-key }}
+        PITCREW_API_BASE_URL: ${{ inputs.api-base-url }}
+        GITHUB_TOKEN: ${{ steps.app-token.outputs.token || inputs.github-token }}
+        REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
+        # Pinning the wrapper action pins its steps, not the binary they
+        # install: it runs `curl -fsSL https://opencode.ai/install | bash`,
+        # which without this resolves to whatever is newest. The installer reads
+        # VERSION, so this makes the runtime download a known one. It is not a
+        # checksum - the download still comes from that host - but a new release
+        # cannot arrive here on its own. See docs/threat-model.md.
+        VERSION: ${{ inputs.opencode-version }}
+        # This, and not the `agent` input below, is what selects the agent and
+        # with it every permission in its profile. Merged over anything the
+        # runtime would otherwise read from the checked-out branch.
+        OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+      with:
+        model: ${{ steps.config.outputs.model }}
+        # Passed for the day this input starts working again. In the pinned
+        # version it does nothing: `github.handler.ts` omits the agent when it
+        # prompts the session and falls back to `build`, which allows
+        # everything. What selects the agent is OPENCODE_CONFIG_CONTENT above.
+        agent: ${{ inputs.agent }}
+        prompt: ${{ steps.config.outputs.prompt }}
+        use_github_token: 'true'
+        # Sharing uploads the session transcript to opencode.ai. Off, always -
+        # somebody else's diff has no business leaving the runner.
+        share: 'false'
+
+    # A run whose agent wrote no report is not a run that found nothing, and the
+    # difference is expensive: without that file there are no inline comments
+    # either, so whatever it did find is gone. Over four consecutive runs of one
+    # pull request the security agent wrote none three times. Sharpening the
+    # prompt did not stop it - wording is not the lever.
+    #
+    # What the session *does* contain is the review. ensure-report.mjs reads it
+    # (a `write_report` call, a write of the file, JSON in the reply) and only
+    # then spends one more turn asking for the tool by name. No second review.
+    - name: Recover the report the agent already produced
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
+        MODEL: ${{ steps.config.outputs.model }}
+        PITCREW_API_KEY: ${{ inputs.api-key }}
+        PITCREW_API_BASE_URL: ${{ inputs.api-base-url }}
+        OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+      run: node "$PITCREW_HOME/scripts/ensure-report.mjs"
+
+    # Always: a run that went wrong is exactly when the video and the logs are
+    # worth having.
+    - name: Upload the proof
+      if: ${{ always() && inputs.artifact-name != '' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ github.workspace }}/.pitcrew-run/proof
+        if-no-files-found: warn
+        retention-days: ${{ inputs.artifact-retention-days }}
+
+    # Runs even when the agent failed: a partial report still beats silence.
+    # `!cancelled()` rather than `always()`, because a cancelled run is a
+    # superseded one, not a failed review. A push that supersedes the run before
+    # the agent has answered would otherwise leave an empty "no report" comment
+    # behind - noise on exactly the pull request this exists to keep readable.
+    - name: Publish the report
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number || github.event.issue.number }}
+        REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
+        REVIEW_TITLE: ${{ steps.manifest.outputs.title }}
+        REPORT_KIND: ${{ steps.manifest.outputs.report }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        ARTIFACT_LABEL: ${{ inputs.artifact-label || inputs.artifact-name }}
+        PITCREW_FAIL_ON: ${{ inputs.fail-on }}
+        PITCREW_FAIL_ON_NO_REPORT: ${{ inputs.fail-on-no-report }}
+      run: node "$PITCREW_HOME/scripts/publish-report.mjs"
+
+    # The transcript of the run, below the report in the run summary: one line
+    # per tool call, its input behind a fold, and the agent's own text. The
+    # outcome and the work are different questions, and only the first had an
+    # answer anybody could find - the second was in the raw job log, unfolded
+    # and unstructured. Deliberately not on the pull request: this is a log, and
+    # a log in a comment is a wall.
+    - name: Publish the agent's steps
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        TRANSCRIPT_TITLE: ${{ steps.manifest.outputs.title }}
+        # Values under a name that sounds like a secret are recognised on their
+        # own; a test account's address is neither, and is a secret all the
+        # same. A step summary is not masked the way the log is.
+        TRANSCRIPT_REDACT: PITCREW_TARGET_USERNAME
+      run: node "$PITCREW_HOME/scripts/publish-transcript.mjs"

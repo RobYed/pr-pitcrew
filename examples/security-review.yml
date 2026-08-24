@@ -1,0 +1,29 @@
+# Copy this into your repository as `.github/workflows/pitcrew-security-review.yml`.
+#
+# Independent of the bug review: enable either, both, or neither. They share
+# nothing but the endpoint and the key.
+#
+# Rerun on a pull request by commenting `/security`.
+
+name: Security Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: security-review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'push' }}
+  cancel-in-progress: true
+
+jobs:
+  security-review:
+    uses: RobYed/pr-pitcrew/.github/workflows/security-review.yml@v1
+    secrets:
+      api-key: ${{ secrets.PITCREW_API_KEY }}
