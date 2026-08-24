@@ -174,7 +174,12 @@ export function fillPrompt(text, env = process.env, names = PLACEHOLDERS) {
   const out = names.reduce((current, name) => {
     const value = env[name];
     if (!value) return current;
-    const next = current.replace(new RegExp(`\\$\\{${name}\\}|\\$${name}\\b`, 'g'), value);
+    // A function, not the string: as a replacement argument, `$&`, `` $` ``,
+    // `$'`, `$$` and `$1`-`$9` are expanded rather than inserted. These values
+    // are repository variables somebody typed - a URL, a path, a language - and
+    // a `$&` in one would arrive at the agent as a plausible-looking path that
+    // is not the one anybody configured. A function replacement is literal.
+    const next = current.replace(new RegExp(`\\$\\{${name}\\}|\\$${name}\\b`, 'g'), () => value);
     if (next !== current) filled.push(name);
     return next;
   }, String(text));

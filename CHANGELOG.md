@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-24
+
+### Fixed
+
+- A repository variable containing a dollar sign reached the agent mangled. The
+  prompt's placeholders were substituted with `String.replace` and a string
+  argument, which expands `$&`, `` $` ``, `$'`, `$$` and `$1`-`$9` in the
+  replacement - so a `PITCREW_TARGET_URL` or a path with a dollar sign in it
+  arrived as a different, plausible-looking value.
+
 ## [1.0.0] - 2026-08-24
 
 First public release.
@@ -49,5 +59,6 @@ Version `1.0.0` rather than `0.1.0`: the interface is the one that has been
 running in a private repository for weeks, and `@v1` is what the examples and
 the documentation reference.
 
-[Unreleased]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/RobYed/pr-pitcrew/releases/tag/v1.0.0

@@ -285,6 +285,18 @@ describe('fillPrompt', () => {
     assert.deepEqual(filled, ['DIFF_FILE']);
   });
 
+  it('inserts a value containing $ literally', () => {
+    // `replace` with a string argument expands `$&`, "$`", `$'`, `$$` and
+    // `$1`-`$9` in the replacement. These values are repository variables
+    // somebody typed, so one containing a dollar sign used to arrive at the
+    // agent as a different, plausible-looking path.
+    for (const value of ['/run/$&report.json', "/run/$'report.json", '/run/$$report.json', '/run/$1report.json']) {
+      const { text } = fillPrompt('Write $REPORT_FILE.', { REPORT_FILE: value });
+      assert.equal(text, `Write ${value}.`);
+    }
+    assert.equal(fillPrompt('Write $REPORT_FILE.', { REPORT_FILE: '/run/$`report.json' }).text, 'Write /run/$`report.json.');
+  });
+
   it('leaves a placeholder with no value written as it is', () => {
     // A literal `$WORK_DIR` is a puzzle somebody can solve; an empty string is
     // a path that looks real and is not.
