@@ -1,7 +1,19 @@
-# PR Pitcrew
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img
+      src="docs/assets/logo.svg"
+      alt="PR Pitcrew - bug, security and acceptance review agents for your pull requests"
+      width="520">
+  </picture>
+</p>
 
-[![CI](https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml/badge.svg)](https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml"><img
+    src="https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img
+    src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 Three review agents for your pull requests, installed as GitHub Actions workflows and run on your
 own LLM endpoint. Open a pull request and it is read for bugs and for security defects, with each
