@@ -6,10 +6,10 @@
 Three review agents for your pull requests, installed as GitHub Actions workflows and run on your
 own LLM endpoint. Open a pull request and it is read for bugs and for security defects, with each
 finding written as a comment on the line it is about. Ask for the third one and an agent with a
-browser drives your deployed app, walks the linked issue's acceptance criteria, and leaves the
-recording behind.
+browser drives your app, walks the linked issue's acceptance criteria, and leaves the
+recording behind for you to check.
 
-A pit crew, then: several specialists, each with one job, all at once, and the car leaves in better
+A real pit crew: several specialists, each with one job, all at once, and the car leaves in better
 shape than it arrived.
 
 Three of them ship today:
@@ -28,7 +28,7 @@ is preselected: which model reads your code is a decision you make with your pro
 
 **You push.** `Pitcrew / Bug Review` and `Pitcrew / Security Review` start on the new commits.
 Minutes later the diff carries comments where the defects are, and one summary comment above them:
-verdict, counts by severity, what was looked at. From `high` upward the check is red, and it stays
+verdict, counts by severity, what was looked at. From `high` upward (configurable) the check is red, and it stays
 red until somebody deals with the finding.
 
 **You push again.** Only the commits you added are reviewed, and a point one of the agents already
@@ -45,10 +45,6 @@ input, and what the agent wrote.
 
 ## Who this is for
 
-**A team without a spare reviewer.** Two people, or one, and every pull request waits for the only
-other person who knows the code. The two diff reviews do not replace that person; they take the
-first pass, so what reaches them is the part that needs a human.
-
 **A team whose review bot bills more than it explains.** A hosted service charges per seat, per
 repository or per review, and what was done for that money is not visible from the outside. Here the
 bill arrives from your own provider, per token, for a model you picked, and the run summary shows
@@ -63,6 +59,9 @@ yours to give rather than a vendor's.
 deployed environment to point at, the acceptance test is where this pays off most: the manual
 walk-through somebody does before every merge becomes a table on the pull request and a video to
 check it against.
+
+**A team who wants to skip human review - YOLO!.** Review takes developer's time. You trust AI outputs 
+without any fear. Speed matters more than perfection. What should go wrong?!
 
 ## Quickstart
 
@@ -128,10 +127,10 @@ call, its input behind a fold, and what the agent wrote. The verdict and the wor
 questions.
 
 **Read-only by construction.** The two review agents have no shell, no `webfetch`, no `websearch`
-and no sub-agents; they cannot read `/proc`, `/sys` or `.git/`; they may write only inside a
-git-ignored run directory. That is not a promise made to the model in a prompt, it is a permission
-profile that ships with this package, so a pull request cannot grant its own reviewer a shell even
-by editing every file it can reach. See [`docs/threat-model.md`](docs/threat-model.md).
+and no sub-agents; they may write only inside a git-ignored run directory. That is not a promise 
+made to the model in a prompt, it is a permission profile that ships with this package, so a pull 
+request cannot grant its own reviewer a shell even by editing every file it can reach. 
+See [`docs/threat-model.md`](docs/threat-model.md).
 
 ## Updating, and pinning
 
@@ -144,7 +143,7 @@ uses: RobYed/pr-pitcrew/.github/workflows/bug-review.yml@a1b2c3d4...  # v1.0.0
 
 Both are supported. `@v1` is the convenient one, a SHA is the deliberate one.
 
-## The acceptance test
+## The acceptance test agent
 
 This one costs more than the other two: a container, a browser, up to half an hour, and real
 operations against a real environment. So **it does not start itself**. It starts when somebody
