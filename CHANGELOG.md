@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.1] - 2026-08-24
-
-### Fixed
-
-- A repository variable containing a dollar sign reached the agent mangled. The
-  prompt's placeholders were substituted with `String.replace` and a string
-  argument, which expands `$&`, `` $` ``, `$'`, `$$` and `$1`-`$9` in the
-  replacement - so a `PITCREW_TARGET_URL` or a path with a dollar sign in it
-  arrived as a different, plausible-looking value.
-
 ## [1.0.0] - 2026-08-24
 
 First public release.
@@ -44,6 +34,17 @@ First public release.
   package's self-references are rewritten to the tag, and moves the major tag.
 - `docs/threat-model.md` and decision records under `docs/adr/`.
 
+### Names
+
+Everything that configures the model provider carries `LLM_API_`:
+`PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`, `PITCREW_LLM_API_MODEL` and
+the per-agent `PITCREW_LLM_API_MODEL_<AGENT>`. Everything else does not:
+`PITCREW_TARGET_URL`, `PITCREW_FAIL_ON`, `PITCREW_ACCEPTANCE_REVIEWER`. Two names
+here mean "base URL" and two mean "credentials", pointing at the model provider
+and at the application under test respectively, so they are sorted into two
+families where the difference is visible while typing. See
+`docs/adr/0001-the-name.md`.
+
 ### Note for anyone migrating from the private bundle this grew out of
 
 The invisible markers under the package's own comments were renamed from
@@ -59,6 +60,5 @@ Version `1.0.0` rather than `0.1.0`: the interface is the one that has been
 running in a private repository for weeks, and `@v1` is what the examples and
 the documentation reference.
 
-[Unreleased]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.1...HEAD
-[1.0.1]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.0...v1.0.1
+[Unreleased]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/RobYed/pr-pitcrew/releases/tag/v1.0.0

@@ -229,8 +229,8 @@ describe('buildConfig', () => {
 
   it('refers to the endpoint and the key rather than embedding them', () => {
     const { options } = config().provider.llm;
-    assert.equal(options.baseURL, '{env:PITCREW_API_BASE_URL}');
-    assert.equal(options.apiKey, '{env:PITCREW_API_KEY}');
+    assert.equal(options.baseURL, '{env:PITCREW_LLM_API_BASE_URL}');
+    assert.equal(options.apiKey, '{env:PITCREW_LLM_API_KEY}');
   });
 
   it('cannot carry a secret into the file, because it never reads one', () => {
@@ -239,16 +239,16 @@ describe('buildConfig', () => {
     // substitution happens in the runtime, from its own environment.
     const key = 'sk-test-000111222333444555666777888999';
     const baseUrl = 'https://models.example.invalid/v1';
-    const before = { PITCREW_API_KEY: process.env.PITCREW_API_KEY, PITCREW_API_BASE_URL: process.env.PITCREW_API_BASE_URL };
-    process.env.PITCREW_API_KEY = key;
-    process.env.PITCREW_API_BASE_URL = baseUrl;
+    const before = { PITCREW_LLM_API_KEY: process.env.PITCREW_LLM_API_KEY, PITCREW_LLM_API_BASE_URL: process.env.PITCREW_LLM_API_BASE_URL };
+    process.env.PITCREW_LLM_API_KEY = key;
+    process.env.PITCREW_LLM_API_BASE_URL = baseUrl;
     try {
       const json = JSON.stringify(config());
       assert.equal(json.includes(key), false, 'the key reached the configuration file');
       assert.equal(json.includes(baseUrl), false, 'the endpoint reached the configuration file');
       assert.equal(json.includes('models.example.invalid'), false);
       assert.doesNotMatch(json, /sk-[A-Za-z0-9-]{8,}/, 'something key-shaped reached the configuration file');
-      assert.ok(json.includes('{env:PITCREW_API_KEY}') && json.includes('{env:PITCREW_API_BASE_URL}'));
+      assert.ok(json.includes('{env:PITCREW_LLM_API_KEY}') && json.includes('{env:PITCREW_LLM_API_BASE_URL}'));
     } finally {
       for (const [name, value] of Object.entries(before)) {
         if (value === undefined) delete process.env[name];
@@ -314,14 +314,14 @@ describe('fillPrompt', () => {
     // key and - in the acceptance job - the credentials of the environment
     // under test. An agent that needs those has a shell and reads them itself.
     const hostile = {
-      PITCREW_API_KEY: 'sk-test-000111222333',
+      PITCREW_LLM_API_KEY: 'sk-test-000111222333',
       GITHUB_TOKEN: 'ghs-test-000111222333',
       HOME: '/home/runner',
       DIFF_FILE: '/run/diff.patch',
     };
-    const { text, filled } = fillPrompt('$PITCREW_API_KEY ${GITHUB_TOKEN} $HOME $DIFF_FILE', hostile);
+    const { text, filled } = fillPrompt('$PITCREW_LLM_API_KEY ${GITHUB_TOKEN} $HOME $DIFF_FILE', hostile);
 
-    assert.equal(text, '$PITCREW_API_KEY ${GITHUB_TOKEN} $HOME /run/diff.patch');
+    assert.equal(text, '$PITCREW_LLM_API_KEY ${GITHUB_TOKEN} $HOME /run/diff.patch');
     assert.deepEqual(filled, ['DIFF_FILE']);
     assert.equal(text.includes('sk-test'), false, 'the model key was substituted into the prompt');
     assert.equal(text.includes('ghs-test'), false, 'the repository token was substituted into the prompt');
@@ -329,7 +329,7 @@ describe('fillPrompt', () => {
 
   it('defaults its allowlist to the placeholders the package documents', () => {
     assert.equal(PLACEHOLDERS.includes('DIFF_FILE'), true);
-    assert.equal(PLACEHOLDERS.includes('PITCREW_API_KEY'), false);
+    assert.equal(PLACEHOLDERS.includes('PITCREW_LLM_API_KEY'), false);
     assert.equal(PLACEHOLDERS.includes('GITHUB_TOKEN'), false);
   });
 

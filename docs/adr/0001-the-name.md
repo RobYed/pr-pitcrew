@@ -41,14 +41,26 @@ Naming surfaces:
 | repository, npm name | `pr-pitcrew` |
 | how it is used | `uses: RobYed/pr-pitcrew/.github/workflows/<agent>.yml@v1` |
 | prose, README title | PR Pitcrew |
-| variables and secrets | `PITCREW_API_KEY`, `PITCREW_API_BASE_URL`, `PITCREW_MODEL`, … |
+| variables and secrets | `PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`, `PITCREW_LLM_API_MODEL`, `PITCREW_TARGET_URL`, … |
 | check names | `Pitcrew / Bug Review` |
 | comment markers | `<!-- pitcrew:summary:<slug> -->`, `<!-- pitcrew:finding -->` |
 | working directory | `.pitcrew-run/` |
 | slash commands | unchanged: `/review`, `/security`, `/acceptance` - they name the agent, not the package |
 
-The prefix stays out of the per-agent variables, or every one of them would read
+The `pr-` prefix stays out of the variables, or every one of them would read
 `PR_PITCREW_TARGET_HEALTH_URL`.
+
+Within `PITCREW_*` there is a second grouping, and it is deliberate. **Everything that configures the
+model provider carries `LLM_API_`**: `PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`,
+`PITCREW_LLM_API_MODEL`, and the per-agent `PITCREW_LLM_API_MODEL_<AGENT>`. Everything else does not:
+`PITCREW_TARGET_URL`, `PITCREW_FAIL_ON`, `PITCREW_ACCEPTANCE_REVIEWER`.
+
+Two names in this package mean "base URL" and two mean "credentials", and they point at completely
+different things - one pair at the model provider, the other at the application the acceptance test
+drives. `PITCREW_BASE_URL` next to `PITCREW_TARGET_URL` invites somebody to put the app's address in
+the wrong one, and the failure is a confusing HTTP error from a host that was never a model endpoint.
+Sorting them into two families makes that mistake visible while typing rather than while reading a
+run log. The `LLM_API_` segment also means one `grep` finds every place a provider is configured.
 
 ## Consequences
 

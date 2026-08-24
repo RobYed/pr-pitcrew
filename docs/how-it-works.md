@@ -17,7 +17,7 @@ jobs:
   bug-review:
     uses: RobYed/pr-pitcrew/.github/workflows/bug-review.yml@v1
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 ```
 
 That calls a reusable workflow in this repository, which decides *when* a run happens and what the
@@ -138,7 +138,7 @@ What is generated looks like this:
   "provider": {
     "llm": {
       "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "{env:PITCREW_API_BASE_URL}", "apiKey": "{env:PITCREW_API_KEY}" },
+      "options": { "baseURL": "{env:PITCREW_LLM_API_BASE_URL}", "apiKey": "{env:PITCREW_LLM_API_KEY}" },
       "models": { "<the model>": { "name": "<the model>" } }
     }
   },
@@ -662,11 +662,11 @@ jobs:
   bug:
     uses: RobYed/pr-pitcrew/.github/workflows/bug-review.yml@v1
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
   security:
     uses: RobYed/pr-pitcrew/.github/workflows/security-review.yml@v1
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 ```
 
 Your own workflows then hold `workflow_call:` instead of `pull_request:`, because the orchestrator

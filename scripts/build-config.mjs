@@ -136,7 +136,7 @@ export function buildConfig({ agent, profile, model, temperature, description })
       [PROVIDER]: {
         npm: '@ai-sdk/openai-compatible',
         name: 'LLM provider',
-        options: { baseURL: '{env:PITCREW_API_BASE_URL}', apiKey: '{env:PITCREW_API_KEY}' },
+        options: { baseURL: '{env:PITCREW_LLM_API_BASE_URL}', apiKey: '{env:PITCREW_LLM_API_KEY}' },
         // Written here rather than listed in the package: which models an
         // endpoint serves is the endpoint's business, not a second list for
         // somebody to keep current.
@@ -196,13 +196,13 @@ function main() {
   const model = (process.env.MODEL ?? '').trim();
   if (!model) {
     fail(
-      'No model is configured. Set the repository variable PITCREW_MODEL (or the per-agent one this workflow reads) to a model id your endpoint serves.',
+      'No model is configured. Set the repository variable PITCREW_LLM_API_MODEL (or the per-agent one this workflow reads) to a model id your endpoint serves.',
     );
   }
   const baseUrl = (process.env.BASE_URL ?? '').trim();
   if (!baseUrl) {
     fail(
-      'No endpoint is configured. Set the repository variable PITCREW_API_BASE_URL to the base URL of your OpenAI-compatible provider, e.g. https://api.example.com/v1.',
+      'No endpoint is configured. Set the repository variable PITCREW_LLM_API_BASE_URL to the base URL of your OpenAI-compatible provider, e.g. https://api.example.com/v1.',
     );
   }
 

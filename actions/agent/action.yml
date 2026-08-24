@@ -318,8 +318,8 @@ runs:
         # as configuration values, because the generated config refers to them
         # as `{env:...}` and OpenCode substitutes them when it reads it. The key
         # therefore never passes through a step output on its way here.
-        PITCREW_API_KEY: ${{ inputs.api-key }}
-        PITCREW_API_BASE_URL: ${{ inputs.api-base-url }}
+        PITCREW_LLM_API_KEY: ${{ inputs.api-key }}
+        PITCREW_LLM_API_BASE_URL: ${{ inputs.api-base-url }}
         GITHUB_TOKEN: ${{ steps.app-token.outputs.token || inputs.github-token }}
         REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
         # Pinning the wrapper action pins its steps, not the binary they
@@ -361,8 +361,8 @@ runs:
       env:
         REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
         MODEL: ${{ steps.config.outputs.model }}
-        PITCREW_API_KEY: ${{ inputs.api-key }}
-        PITCREW_API_BASE_URL: ${{ inputs.api-base-url }}
+        PITCREW_LLM_API_KEY: ${{ inputs.api-key }}
+        PITCREW_LLM_API_BASE_URL: ${{ inputs.api-base-url }}
         OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
       run: node "$PITCREW_HOME/scripts/ensure-report.mjs"
 

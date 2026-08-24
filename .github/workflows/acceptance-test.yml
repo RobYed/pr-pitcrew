@@ -20,12 +20,12 @@ on:
   workflow_call:
     inputs:
       model:
-        description: Model id. Defaults to PITCREW_MODEL_ACCEPTANCE_TEST, then PITCREW_MODEL.
+        description: Model id. Defaults to PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST, then PITCREW_LLM_API_MODEL.
         type: string
         required: false
         default: ''
       api-base-url:
-        description: OpenAI-compatible endpoint. Defaults to the variable PITCREW_API_BASE_URL.
+        description: OpenAI-compatible endpoint. Defaults to the variable PITCREW_LLM_API_BASE_URL.
         type: string
         required: false
         default: ''
@@ -170,11 +170,11 @@ jobs:
         with:
           agent: acceptance-test
           api-key: ${{ secrets.api-key }}
-          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_API_BASE_URL }}
+          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_LLM_API_BASE_URL }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           app-id: ${{ vars.PITCREW_APP_ID }}
           app-private-key: ${{ secrets.app-private-key }}
-          model: ${{ inputs.model || vars.PITCREW_MODEL_ACCEPTANCE_TEST || vars.PITCREW_MODEL }}
+          model: ${{ inputs.model || vars.PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST || vars.PITCREW_LLM_API_MODEL }}
           target-url: ${{ inputs.target-url || vars.PITCREW_TARGET_URL }}
           target-username: ${{ secrets.target-username }}
           target-password: ${{ secrets.target-password }}

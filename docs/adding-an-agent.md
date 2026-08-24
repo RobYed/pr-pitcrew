@@ -32,7 +32,7 @@ repository's licence and its own text rules, and writes `findings`.
   "report": "findings",
   "inputs": ["diff"],
   "temperature": 0.1,
-  "modelVariable": "PITCREW_MODEL_LEGAL_REVIEW"
+  "modelVariable": "PITCREW_LLM_API_MODEL_LEGAL_REVIEW"
 }
 ```
 
@@ -148,7 +148,7 @@ on:
   workflow_call:
     inputs:
       model:
-        description: Model id. Defaults to PITCREW_MODEL_LEGAL_REVIEW, then PITCREW_MODEL.
+        description: Model id. Defaults to PITCREW_LLM_API_MODEL_LEGAL_REVIEW, then PITCREW_LLM_API_MODEL.
         type: string
         required: false
         default: ''
@@ -204,11 +204,11 @@ jobs:
         with:
           agent: legal-review
           api-key: ${{ secrets.api-key }}
-          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_API_BASE_URL }}
+          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_LLM_API_BASE_URL }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           app-id: ${{ vars.PITCREW_APP_ID }}
           app-private-key: ${{ secrets.app-private-key }}
-          model: ${{ inputs.model || vars.PITCREW_MODEL_LEGAL_REVIEW || vars.PITCREW_MODEL }}
+          model: ${{ inputs.model || vars.PITCREW_LLM_API_MODEL_LEGAL_REVIEW || vars.PITCREW_LLM_API_MODEL }}
           fail-on: ${{ inputs.fail-on || vars.PITCREW_FAIL_ON }}
           fail-on-no-report: ${{ vars.PITCREW_FAIL_ON_NO_REPORT }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}
@@ -259,7 +259,7 @@ jobs:
   legal-review:
     uses: RobYed/pr-pitcrew/.github/workflows/legal-review.yml@v1
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 ```
 
 The comment id in the concurrency key is not optional folklore. Concurrency is evaluated when a run
@@ -312,8 +312,8 @@ repository doing nothing.
 | A `report` other than `findings` or `criteria` | `<path> declares report "x"; known kinds are "findings" and "criteria".` |
 | No `prompt.md` | `<path> is missing, so there is nothing to ask the agent.` |
 | A `profile` with no file in `profiles/` | `Agent "<id>" wants the permission profile "x", which this package does not define.` |
-| No model configured | `No model is configured. Set the repository variable PITCREW_MODEL …` |
-| No endpoint configured | `No endpoint is configured. Set the repository variable PITCREW_API_BASE_URL …` |
+| No model configured | `No model is configured. Set the repository variable PITCREW_LLM_API_MODEL …` |
+| No endpoint configured | `No endpoint is configured. Set the repository variable PITCREW_LLM_API_BASE_URL …` |
 
 The first seven come out of `scripts/build-config.mjs`, and `scripts/read-manifest.mjs` hits most of
 them one step earlier, before anything has fetched a diff or spent a token.

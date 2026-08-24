@@ -19,7 +19,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function* walk(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    // `.claude` holds agent worktrees - checkouts of this same repository, so
+    // walking into one double-counts every file and reports the count wrong.
+    if (['.git', '.claude', 'node_modules'].includes(entry.name)) continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) yield* walk(path);
     else yield path;

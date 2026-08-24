@@ -41,6 +41,6 @@ jobs:
   acceptance-test:
     uses: RobYed/pr-pitcrew/.github/workflows/acceptance-test.yml@v1
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
       target-username: ${{ secrets.PITCREW_TARGET_USERNAME }}
       target-password: ${{ secrets.PITCREW_TARGET_PASSWORD }}

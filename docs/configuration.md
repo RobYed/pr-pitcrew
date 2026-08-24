@@ -21,11 +21,11 @@ Settings → Secrets and variables → Actions → Variables.
 
 | Name | Applies to | Required | Default | Effect |
 | --- | --- | --- | --- | --- |
-| `PITCREW_API_BASE_URL` | all | yes | none | Base URL of the OpenAI-compatible endpoint, **including the version segment**: `https://api.example.com/v1`. This package names no vendor. |
-| `PITCREW_MODEL` | all | yes, unless every agent has its own | none | A model id the endpoint serves, for every agent without one of its own. Passed through as the endpoint spells it, slashes included. |
-| `PITCREW_MODEL_BUG_REVIEW` | bug review | no | `PITCREW_MODEL` | Model for that one agent. |
-| `PITCREW_MODEL_SECURITY_REVIEW` | security review | no | `PITCREW_MODEL` | Model for that one agent. |
-| `PITCREW_MODEL_ACCEPTANCE_TEST` | acceptance test | no | `PITCREW_MODEL` | Model for that one agent. Reading a diff and driving a browser for half an hour are different jobs. |
+| `PITCREW_LLM_API_BASE_URL` | all | yes | none | Base URL of the OpenAI-compatible endpoint, **including the version segment**: `https://api.example.com/v1`. This package names no vendor. |
+| `PITCREW_LLM_API_MODEL` | all | yes, unless every agent has its own | none | A model id the endpoint serves, for every agent without one of its own. Passed through as the endpoint spells it, slashes included. |
+| `PITCREW_LLM_API_MODEL_BUG_REVIEW` | bug review | no | `PITCREW_LLM_API_MODEL` | Model for that one agent. |
+| `PITCREW_LLM_API_MODEL_SECURITY_REVIEW` | security review | no | `PITCREW_LLM_API_MODEL` | Model for that one agent. |
+| `PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST` | acceptance test | no | `PITCREW_LLM_API_MODEL` | Model for that one agent. Reading a diff and driving a browser for half an hour are different jobs. |
 | `PITCREW_FAIL_ON` | bug and security review | no | `high` | Severity from which findings fail the check: `high`, `medium`, `low`, or `never` to keep the agent advisory. Anything else is refused with a warning and `high` is used. |
 | `PITCREW_FAIL_ON_NO_REPORT` | bug and security review | no | `true` | `false` lets a run whose agent produced no usable report stay green. The default fails it, because a diff nobody reviewed is not a diff nobody found anything in. |
 | `PITCREW_OUTPUT_LANGUAGE` | all | no | `English` | The language the agent writes its own text in - the summary sentence, finding bodies, criteria evidence. The frame around that text is English on every run, which is why English is the default. |
@@ -42,7 +42,7 @@ use; what matters is which workflow input you pass them to.
 
 | Convention | Workflow input | Applies to | Required | Effect |
 | --- | --- | --- | --- | --- |
-| `PITCREW_API_KEY` | `api-key` | all | yes | Key for the OpenAI-compatible endpoint. Reaches OpenCode as an environment variable and never passes through a step output. |
+| `PITCREW_LLM_API_KEY` | `api-key` | all | yes | Key for the OpenAI-compatible endpoint. Reaches OpenCode as an environment variable and never passes through a step output. |
 | `PITCREW_APP_PRIVATE_KEY` | `app-private-key` | all | no | Private key of the GitHub App in `PITCREW_APP_ID`. |
 | `PITCREW_TARGET_USERNAME` | `target-username` | acceptance test | no | Username or e-mail for the application under test. When empty, the agent demonstrates what is reachable without an account and records the rest as `not-demonstrable`, with the reason. |
 | `PITCREW_TARGET_PASSWORD` | `target-password` | acceptance test | no | Password for the application under test. |
@@ -78,7 +78,7 @@ jobs:
     with:
       fail-on: medium
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 ```
 
 `@v1` is a tag that moves, so a fix arrives without touching a file. Pin a SHA instead if you would
@@ -90,8 +90,8 @@ Identical apart from the agent they run, the check name, and the slash command t
 
 | Input | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `model` | string | `PITCREW_MODEL_BUG_REVIEW` / `PITCREW_MODEL_SECURITY_REVIEW`, then `PITCREW_MODEL` | Model id. |
-| `api-base-url` | string | `PITCREW_API_BASE_URL` | OpenAI-compatible endpoint. |
+| `model` | string | `PITCREW_LLM_API_MODEL_BUG_REVIEW` / `PITCREW_LLM_API_MODEL_SECURITY_REVIEW`, then `PITCREW_LLM_API_MODEL` | Model id. |
+| `api-base-url` | string | `PITCREW_LLM_API_BASE_URL` | OpenAI-compatible endpoint. |
 | `fail-on` | string | `PITCREW_FAIL_ON`, then `high` | Severity from which the check fails. |
 | `output-language` | string | `PITCREW_OUTPUT_LANGUAGE`, then `English` | Language the agent writes in. |
 | `timeout-minutes` | number | `20` | Job timeout. |
@@ -116,8 +116,8 @@ request are governed by the issues permission.
 
 | Input | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `model` | string | `PITCREW_MODEL_ACCEPTANCE_TEST`, then `PITCREW_MODEL` | Model id. |
-| `api-base-url` | string | `PITCREW_API_BASE_URL` | OpenAI-compatible endpoint. |
+| `model` | string | `PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST`, then `PITCREW_LLM_API_MODEL` | Model id. |
+| `api-base-url` | string | `PITCREW_LLM_API_BASE_URL` | OpenAI-compatible endpoint. |
 | `target-url` | string | `PITCREW_TARGET_URL` | The deployed application to drive. |
 | `target-health-url` | string | `PITCREW_TARGET_HEALTH_URL` | Endpoint naming the deployed commit. |
 | `output-language` | string | `PITCREW_OUTPUT_LANGUAGE`, then `English` | Language the agent writes in. |

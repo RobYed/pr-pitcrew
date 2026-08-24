@@ -45,16 +45,16 @@ jobs:
   bug-review:
     uses: RobYed/pr-pitcrew/.github/workflows/bug-review.yml@v1
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 ```
 
 Then, under **Settings → Secrets and variables → Actions**:
 
 | | |
 | --- | --- |
-| secret `PITCREW_API_KEY` | the key for your endpoint |
-| variable `PITCREW_API_BASE_URL` | the endpoint, including the version segment: `https://api.example.com/v1` |
-| variable `PITCREW_MODEL` | a model id that endpoint serves, e.g. `gpt-4o-mini` |
+| secret `PITCREW_LLM_API_KEY` | the key for your endpoint |
+| variable `PITCREW_LLM_API_BASE_URL` | the endpoint, including the version segment: `https://api.example.com/v1` |
+| variable `PITCREW_LLM_API_MODEL` | a model id that endpoint serves, e.g. `gpt-4o-mini` |
 
 Open a pull request. There is no fourth step.
 

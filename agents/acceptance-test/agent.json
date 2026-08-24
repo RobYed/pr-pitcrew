@@ -8,5 +8,5 @@
   "report": "criteria",
   "inputs": ["issue", "target"],
   "temperature": 0.1,
-  "modelVariable": "PITCREW_MODEL_ACCEPTANCE_TEST"
+  "modelVariable": "PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST"
 }

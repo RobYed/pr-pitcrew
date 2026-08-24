@@ -32,9 +32,9 @@ jobs:
   bug:
     uses: ./.github/workflows/bug-review.yml
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 
   security:
     uses: ./.github/workflows/security-review.yml
     secrets:
-      api-key: ${{ secrets.PITCREW_API_KEY }}
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}

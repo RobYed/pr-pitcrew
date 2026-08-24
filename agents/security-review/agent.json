@@ -8,5 +8,5 @@
   "report": "findings",
   "inputs": ["diff"],
   "temperature": 0.1,
-  "modelVariable": "PITCREW_MODEL_SECURITY_REVIEW"
+  "modelVariable": "PITCREW_LLM_API_MODEL_SECURITY_REVIEW"
 }

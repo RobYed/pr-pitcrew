@@ -16,12 +16,12 @@ on:
   workflow_call:
     inputs:
       model:
-        description: Model id. Defaults to PITCREW_MODEL_SECURITY_REVIEW, then PITCREW_MODEL.
+        description: Model id. Defaults to PITCREW_LLM_API_MODEL_SECURITY_REVIEW, then PITCREW_LLM_API_MODEL.
         type: string
         required: false
         default: ''
       api-base-url:
-        description: OpenAI-compatible endpoint. Defaults to the variable PITCREW_API_BASE_URL.
+        description: OpenAI-compatible endpoint. Defaults to the variable PITCREW_LLM_API_BASE_URL.
         type: string
         required: false
         default: ''
@@ -93,7 +93,7 @@ jobs:
         with:
           agent: security-review
           api-key: ${{ secrets.api-key }}
-          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_API_BASE_URL }}
+          api-base-url: ${{ inputs.api-base-url || vars.PITCREW_LLM_API_BASE_URL }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           app-id: ${{ vars.PITCREW_APP_ID }}
           app-private-key: ${{ secrets.app-private-key }}
@@ -101,7 +101,7 @@ jobs:
           # for half an hour are different jobs, and the model that is cheap and
           # right for one is not automatically either for the other. Neither has
           # a default: with both unset the run stops and says so.
-          model: ${{ inputs.model || vars.PITCREW_MODEL_SECURITY_REVIEW || vars.PITCREW_MODEL }}
+          model: ${{ inputs.model || vars.PITCREW_LLM_API_MODEL_SECURITY_REVIEW || vars.PITCREW_LLM_API_MODEL }}
           fail-on: ${{ inputs.fail-on || vars.PITCREW_FAIL_ON }}
           fail-on-no-report: ${{ vars.PITCREW_FAIL_ON_NO_REPORT }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}

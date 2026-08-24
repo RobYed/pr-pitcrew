@@ -14,7 +14,7 @@
  * Nothing here may fail the job. A rescue that fails leaves the state
  * publish-report.mjs already knows how to describe.
  *
- * Environment: REPORT_FILE, MODEL, PITCREW_API_KEY, PITCREW_API_BASE_URL,
+ * Environment: REPORT_FILE, MODEL, PITCREW_LLM_API_KEY, PITCREW_LLM_API_BASE_URL,
  * OPENCODE_CONFIG_CONTENT (the last four only for the continue turn).
  * SESSION_EXPORT skips the CLI listing and reads that file instead — the
  * try-it-out path, same as publish-transcript.mjs.
