@@ -11,7 +11,8 @@ footer of the main README carries that logo.
 | --- | --- |
 | [`logo.svg`](logo.svg) | The full lockup, for light backgrounds. Used at the top of the README. |
 | [`logo-dark.svg`](logo-dark.svg) | The same lockup with the palette for dark backgrounds. |
-| [`mark.svg`](mark.svg) | The mark alone, square, in tones that carry on either background. |
+| [`mark.svg`](mark.svg) | The mark alone, square, for light backgrounds. |
+| [`mark-dark.svg`](mark-dark.svg) | The same, for dark backgrounds. |
 | [`dey-ai-solutions_light-bg.svg`](dey-ai-solutions_light-bg.svg) | The Dey AI Solutions logo, light backgrounds. |
 | [`dey-ai-solutions_dark-bg.svg`](dey-ai-solutions_dark-bg.svg) | The same, for dark backgrounds. |
 
@@ -20,20 +21,23 @@ honours; anything that ignores it falls back to the light one.
 
 ## Colours
 
-Every value is a design-system token. The accent is spent on the three lines and on nothing else,
-because the system asks for it sparingly - the same discipline that makes `AI` the only orange in
-the Dey AI Solutions wordmark.
+Every value is a design-system token. Colour is spent on the three lines and on nothing else: the
+commit, the lanes, the wordmark and the tagline are all neutrals.
 
 | | Token | Light | Dark |
 | --- | --- | --- | --- |
 | Wordmark | `--ink-soft` / `--fg-strong` | `#38322e` | `#f3ede2` |
 | Tagline | `--fg-dim` / `--fg-muted` | `#6f655a` | `#a59a8a` |
 | Commit and lanes | `--fg-dim` / `--fg-muted` | `#6f655a` | `#a59a8a` |
-| The three lines | `--accent-soft` / `--accent` | `#d9874a` | `#f1a83c` |
+| Bug line | `--accent-dim` / `--accent` | `#7d5a36` | `#f1a83c` |
+| Security line | `--accent-soft` | `#d9874a` | `#d9874a` |
+| Acceptance line | `--accent` / `--accent-dim` | `#f1a83c` | `#7d5a36` |
 
-Which accent tone carries depends on what it has to hold up against: `--accent` reaches 8.7:1 on the
-brand's dark but only 2:1 on white, so light backgrounds get `--accent-soft` instead. The three
-lines are one colour, not three: they are told apart by where they sit and how long they are.
+The three accent tones invert between backgrounds, and by a lot: `--accent` reaches 9.4:1 on dark
+and 2:1 on white, `--accent-dim` 6.2:1 on white and 3.1:1 on dark. So the rule is not a fixed colour
+per line but a fixed order - the tone that holds up best against the background sits at the top, the
+one that holds up least at the foot. Both themes read as the same ramp; which tones fill it changes,
+the way the wordmark changes from anthracite to cream.
 
 ## Type
 
