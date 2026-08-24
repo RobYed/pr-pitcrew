@@ -89,7 +89,7 @@ jobs:
           # The agent diffs against the base branch, which a shallow clone lacks.
           fetch-depth: 0
 
-      - uses: RobYed/pr-pitcrew/actions/agent@main
+      - uses: RobYed/pr-pitcrew/actions/agent@v1.0.0
         with:
           agent: bug-review
           api-key: ${{ secrets.api-key }}
