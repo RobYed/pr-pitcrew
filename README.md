@@ -1,7 +1,19 @@
-# PR Pitcrew
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img
+      src="docs/assets/logo.svg"
+      alt="PR Pitcrew - bug, security and acceptance review agents for your pull requests"
+      width="520">
+  </picture>
+</p>
 
-[![CI](https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml/badge.svg)](https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml"><img
+    src="https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img
+    src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 Three review agents for your pull requests, installed as GitHub Actions workflows and run on your
 own LLM endpoint. Open a pull request and it is read for bugs and for security defects, with each
@@ -209,4 +221,27 @@ the whole relationship.
 
 ## Licence
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [`LICENSE`](LICENSE). The Dey AI Solutions name and logo are a trademark and are not
+covered by it.
+
+---
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dey-ai-solutions_dark-bg.svg">
+    <img src="docs/assets/dey-ai-solutions_light-bg.svg" alt="Dey AI Solutions" width="170">
+  </picture>
+</p>
+
+## About Dey AI Solutions
+
+Consulting for applied AI. I help teams find the right use cases and ship autonomous agents that
+hold up in production, not just in the demo:
+
+- **Use-case analysis** - what's worth building, and what isn't
+- **Autonomous agents** - production-grade, with guardrails & observability
+- **Robust engineering** - maintainable systems your team can run without us
+- **Agentic coding** - getting your codebase and team ready for coding agents
+
+Got an idea for an agent of your own? &rarr; [deyai.solutions](https://deyai.solutions) &middot;
+[hello@deyai.solutions](mailto:hello@deyai.solutions)
