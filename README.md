@@ -65,7 +65,9 @@ without any fear. Speed matters more than perfection. What should go wrong?!
 
 ## Quickstart
 
-One file in your repository. That is the whole installation.
+One file per agent, and that file is the whole of the agent's installation: the scripts, the prompts
+and the permission profiles travel with the package instead of into your repository. This is the bug
+review:
 
 ```yaml
 # .github/workflows/pitcrew-bug-review.yml
@@ -93,7 +95,7 @@ jobs:
       api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
 ```
 
-Then, under **Settings → Secrets and variables → Actions**:
+Then, once for all three agents, under **Settings → Secrets and variables → Actions**:
 
 | | |
 | --- | --- |
@@ -103,8 +105,10 @@ Then, under **Settings → Secrets and variables → Actions**:
 
 Open a pull request. There is no fourth step.
 
-`examples/` has the same file for all three agents. Enable one, two or all three; none of them needs
-the others.
+The other two are that same file with another name in it. `examples/` has all three, ready to copy:
+the security review is installed exactly like this one, and the acceptance test differs in what
+starts it and in two variables of its own, which the section below explains. Beyond the endpoint,
+the key and the model, they share nothing, so enable one, two or all three.
 
 ## How the output behaves
 
