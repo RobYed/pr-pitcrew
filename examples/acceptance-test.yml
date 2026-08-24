@@ -6,13 +6,13 @@
 # `PITCREW_ACCEPTANCE_REVIEWER`, which is the same gesture a human reviewer gets.
 #
 # Required beforehand, in addition to the endpoint, key and model:
-#   variable PITCREW_TARGET_URL             the deployed app to drive
-#   variable PITCREW_ACCEPTANCE_REVIEWER    login of the account whose review request starts a run
+#   variable PITCREW_ACCEPTANCE_TARGET_URL         the deployed app to drive
+#   variable PITCREW_ACCEPTANCE_REVIEWER           login of the account whose review request starts a run
 #
 # Optional:
-#   variable PITCREW_TARGET_HEALTH_URL      an endpoint naming the deployed commit
-#   secret   PITCREW_TARGET_USERNAME        credentials for the app, if it needs an account
-#   secret   PITCREW_TARGET_PASSWORD
+#   variable PITCREW_ACCEPTANCE_TARGET_HEALTH_URL  an endpoint naming the deployed commit
+#   secret   PITCREW_ACCEPTANCE_TARGET_USERNAME     credentials for the app, if it needs an account
+#   secret   PITCREW_ACCEPTANCE_TARGET_PASSWORD
 #
 # The reviewer account is an ordinary GitHub user (a machine account is enough)
 # with read access to the repository. Do **not** put it in CODEOWNERS: GitHub
@@ -42,5 +42,5 @@ jobs:
     uses: RobYed/pr-pitcrew/.github/workflows/acceptance-test.yml@v1
     secrets:
       api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
-      target-username: ${{ secrets.PITCREW_TARGET_USERNAME }}
-      target-password: ${{ secrets.PITCREW_TARGET_PASSWORD }}
+      target-username: ${{ secrets.PITCREW_ACCEPTANCE_TARGET_USERNAME }}
+      target-password: ${{ secrets.PITCREW_ACCEPTANCE_TARGET_PASSWORD }}

@@ -106,9 +106,11 @@ requests a review from the account in `PITCREW_ACCEPTANCE_REVIEWER`, which is th
 human reviewer gets. Removing that reviewer and adding them back is how you ask for a second run.
 `/acceptance` in a comment does the same.
 
-It needs `PITCREW_TARGET_URL` (the deployed app), and takes credentials for it if it has a login. It
-refuses to run in a public repository unless you switch that off knowingly: it has a shell, and in a
-public repository anyone can write the pull request comments that reach it. See
+It needs `PITCREW_ACCEPTANCE_TARGET_URL` (the deployed app), and takes credentials for it if it has
+a login. Everything it needs is named `PITCREW_ACCEPTANCE_*`, so a repository running only the two
+diff reviews can see at a glance that none of it applies. It refuses to run in a public repository
+unless you switch that off knowingly: it has a shell, and in a public repository anyone can write
+the pull request comments that reach it. See
 [`examples/acceptance-test.yml`](examples/acceptance-test.yml) and
 [`docs/threat-model.md`](docs/threat-model.md).
 

@@ -30,7 +30,7 @@ on:
         required: false
         default: ''
       target-url:
-        description: The deployed application to drive. Defaults to the variable PITCREW_TARGET_URL.
+        description: The deployed application to drive. Defaults to the variable PITCREW_ACCEPTANCE_TARGET_URL.
         type: string
         required: false
         default: ''
@@ -38,7 +38,7 @@ on:
         description: >-
           An endpoint whose response names the deployed commit. When set, the run
           refuses to demonstrate somebody else's deployment. Defaults to the
-          variable PITCREW_TARGET_HEALTH_URL.
+          variable PITCREW_ACCEPTANCE_TARGET_HEALTH_URL.
         type: string
         required: false
         default: ''
@@ -147,9 +147,9 @@ jobs:
       # repositories: no shell, no `webfetch`, no `task`, and no way to read the
       # process environment, so hostile text has nowhere to take anything.
       - name: Refuse a public repository
-        if: github.event.repository.private == false && vars.PITCREW_ALLOW_PUBLIC_ACCEPTANCE != 'true'
+        if: github.event.repository.private == false && vars.PITCREW_ACCEPTANCE_ALLOW_PUBLIC != 'true'
         run: |
-          echo '::error::This repository is public, so anyone can comment on a pull request - and those comments reach an agent that has a shell and the credentials of the environment under test. The acceptance test therefore does not run here. Set the repository variable PITCREW_ALLOW_PUBLIC_ACCEPTANCE to true only if you have understood that and accept it. See docs/threat-model.md.'
+          echo '::error::This repository is public, so anyone can comment on a pull request - and those comments reach an agent that has a shell and the credentials of the environment under test. The acceptance test therefore does not run here. Set the repository variable PITCREW_ACCEPTANCE_ALLOW_PUBLIC to true only if you have understood that and accept it. See docs/threat-model.md.'
           exit 1
 
       # A preview environment that every pull request shares can be taken over by
@@ -162,7 +162,7 @@ jobs:
       # issue, not the branch behind it.
       - uses: RobYed/pr-pitcrew/actions/check-deployment@main
         with:
-          health-url: ${{ inputs.target-health-url || vars.PITCREW_TARGET_HEALTH_URL }}
+          health-url: ${{ inputs.target-health-url || vars.PITCREW_ACCEPTANCE_TARGET_HEALTH_URL }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.pull_request.number || github.event.issue.number }}
 
@@ -175,7 +175,7 @@ jobs:
           app-id: ${{ vars.PITCREW_APP_ID }}
           app-private-key: ${{ secrets.app-private-key }}
           model: ${{ inputs.model || vars.PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST || vars.PITCREW_LLM_API_MODEL }}
-          target-url: ${{ inputs.target-url || vars.PITCREW_TARGET_URL }}
+          target-url: ${{ inputs.target-url || vars.PITCREW_ACCEPTANCE_TARGET_URL }}
           target-username: ${{ secrets.target-username }}
           target-password: ${{ secrets.target-password }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}

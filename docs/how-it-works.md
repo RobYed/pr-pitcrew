@@ -217,8 +217,8 @@ Both `$NAME` and `${NAME}`, on a word boundary, so a `$DIFF_FILEX` stays what it
 **An allowlist, not the whole environment.** That process holds the model key and, in the acceptance
 job, the credentials of the environment under test; a prompt is echoed into the run log, and a
 credential has no business in one. The agent that needs those has a shell and reads them from its
-own environment, which is why the acceptance prompt names `PITCREW_TARGET_USERNAME` and
-`PITCREW_TARGET_PASSWORD` without a `$`.
+own environment, which is why the acceptance prompt names `PITCREW_ACCEPTANCE_TARGET_USERNAME` and
+`PITCREW_ACCEPTANCE_TARGET_PASSWORD` without a `$`.
 
 A name that has no value stays written as it is. A literal `$WORK_DIR` in a prompt is a puzzle
 somebody can solve; an empty string is a path that looks real and is not.
@@ -498,7 +498,7 @@ Two properties matter when changing it:
   a credential it was given. So every value this step can see under a name that sounds like a secret
   (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`) is replaced by `[redacted]`, and
   `TRANSCRIPT_REDACT` adds names that do not sound like one. That is how the acceptance run covers
-  `PITCREW_TARGET_USERNAME`: a test account's address is not a password and is a secret all the same.
+  `PITCREW_ACCEPTANCE_TARGET_USERNAME`: a test account's address is not a password and is a secret all the same.
 
 To look at one without a runner: `SESSION_EXPORT=session.json TRANSCRIPT_TITLE='Bug review' node
 scripts/publish-transcript.mjs` prints to stdout what it would append. **That mode never writes to
@@ -719,7 +719,7 @@ artifact is as close as it gets, and that is what the comment carries.
 
 **The deployment under test is the real one**, with its real quotas and its real bills. The prompt
 keeps the number of expensive operations down; nothing stops a run from being wrong about that. And
-a preview URL every pull request shares stays shared: `PITCREW_TARGET_HEALTH_URL` detects a takeover
+a preview URL every pull request shares stays shared: `PITCREW_ACCEPTANCE_TARGET_HEALTH_URL` detects a takeover
 by comparing the deployment's answer against both the head commit and the test merge commit - a
 preview built by a `pull_request` workflow reports the latter - but it cannot prevent one. Without a
 health URL the check is a no-op that says so, because not knowing is not the same as knowing the

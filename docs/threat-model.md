@@ -74,7 +74,7 @@ Concretely:
 
 - **In a public repository it refuses to start.** The runtime puts the pull request's title, body and
   comments into the prompt, and in a public repository anybody with a GitHub account can write those.
-  `PITCREW_ALLOW_PUBLIC_ACCEPTANCE=true` turns the refusal off. Set it only if the previous sentence
+  `PITCREW_ACCEPTANCE_ALLOW_PUBLIC=true` turns the refusal off. Set it only if the previous sentence
   describes a risk you accept.
 - The two review agents are unaffected by that and keep running in public repositories, because the
   analysis above holds for them: hostile text has nowhere to go.
@@ -102,7 +102,7 @@ most of the value. The honest state of things:
 | private | `issue_comment` (`/review`) | same repo | runs |
 | any | `pull_request` | fork | refused; GitHub withholds the secrets anyway |
 | any | `issue_comment` | fork | refused by `assert-same-repo.mjs` |
-| public | acceptance test, any trigger | any | refused unless `PITCREW_ALLOW_PUBLIC_ACCEPTANCE=true` |
+| public | acceptance test, any trigger | any | refused unless `PITCREW_ACCEPTANCE_ALLOW_PUBLIC=true` |
 
 A reviewed, opt-in path for fork pull requests, with shell-less agents only and behind a GitHub
 environment with a required approver, is the obvious next step and is
@@ -176,7 +176,7 @@ Out of the runner, to the model provider **you** configured, and nowhere else:
 - the pull request's title, body and comments, which the runtime puts into the prompt;
 - the linked issue, for the acceptance test;
 - whatever files the agent chooses to read from the checkout, including `AGENTS.md` or `CLAUDE.md`;
-- for the acceptance test, what it sees in the browser at your `PITCREW_TARGET_URL`.
+- for the acceptance test, what it sees in the browser at your `PITCREW_ACCEPTANCE_TARGET_URL`.
 
 Not out of the runner:
 

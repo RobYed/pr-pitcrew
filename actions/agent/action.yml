@@ -263,7 +263,7 @@ runs:
         set -euo pipefail
 
         if [ "$WANTS_TARGET" = 'true' ] && [ -z "$TARGET_URL_IN" ]; then
-          echo '::error::This agent drives a deployed application, and no address was given. Set the repository variable PITCREW_TARGET_URL (or the workflow input `target-url`) to the environment it should test.'
+          echo '::error::This agent drives a deployed application, and no address was given. Set the repository variable PITCREW_ACCEPTANCE_TARGET_URL (or the workflow input `target-url`) to the environment it should test.'
           exit 1
         fi
 
@@ -282,8 +282,8 @@ runs:
 
         # Kept out of the block above so a stray newline in a secret cannot
         # forge a variable assignment.
-        printf 'PITCREW_TARGET_USERNAME<<PITCREW_ENV_EOF\n%s\nPITCREW_ENV_EOF\n' "$TARGET_USERNAME" >> "$GITHUB_ENV"
-        printf 'PITCREW_TARGET_PASSWORD<<PITCREW_ENV_EOF\n%s\nPITCREW_ENV_EOF\n' "$TARGET_PASSWORD" >> "$GITHUB_ENV"
+        printf 'PITCREW_ACCEPTANCE_TARGET_USERNAME<<PITCREW_ENV_EOF\n%s\nPITCREW_ENV_EOF\n' "$TARGET_USERNAME" >> "$GITHUB_ENV"
+        printf 'PITCREW_ACCEPTANCE_TARGET_PASSWORD<<PITCREW_ENV_EOF\n%s\nPITCREW_ENV_EOF\n' "$TARGET_PASSWORD" >> "$GITHUB_ENV"
 
     - name: Build the configuration and the prompt
       id: config
@@ -412,5 +412,5 @@ runs:
         # Values under a name that sounds like a secret are recognised on their
         # own; a test account's address is neither, and is a secret all the
         # same. A step summary is not masked the way the log is.
-        TRANSCRIPT_REDACT: PITCREW_TARGET_USERNAME
+        TRANSCRIPT_REDACT: PITCREW_ACCEPTANCE_TARGET_USERNAME
       run: node "$PITCREW_HOME/scripts/publish-transcript.mjs"

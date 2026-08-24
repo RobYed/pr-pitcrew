@@ -30,10 +30,10 @@ Settings → Secrets and variables → Actions → Variables.
 | `PITCREW_FAIL_ON_NO_REPORT` | bug and security review | no | `true` | `false` lets a run whose agent produced no usable report stay green. The default fails it, because a diff nobody reviewed is not a diff nobody found anything in. |
 | `PITCREW_OUTPUT_LANGUAGE` | all | no | `English` | The language the agent writes its own text in - the summary sentence, finding bodies, criteria evidence. The frame around that text is English on every run, which is why English is the default. |
 | `PITCREW_APP_ID` | all | no | none | Id of a GitHub App. When set, comments carry that app's name and avatar instead of `github-actions[bot]`. Needs `PITCREW_APP_PRIVATE_KEY` as well. |
-| `PITCREW_TARGET_URL` | acceptance test | yes for that agent | none | The deployed application the agent drives. Without it the run stops with an error rather than pretending to test something. |
-| `PITCREW_TARGET_HEALTH_URL` | acceptance test | no | none | An endpoint whose response names the deployed commit. When set, the run refuses to demonstrate somebody else's deployment. Matched against both the head commit and the test merge commit, because a preview built by a `pull_request` workflow reports the latter. Unset means unverified, not refused. |
+| `PITCREW_ACCEPTANCE_TARGET_URL` | acceptance test | yes for that agent | none | The deployed application the agent drives. Without it the run stops with an error rather than pretending to test something. |
+| `PITCREW_ACCEPTANCE_TARGET_HEALTH_URL` | acceptance test | no | none | An endpoint whose response names the deployed commit. When set, the run refuses to demonstrate somebody else's deployment. Matched against both the head commit and the test merge commit, because a preview built by a `pull_request` workflow reports the latter. Unset means unverified, not refused. |
 | `PITCREW_ACCEPTANCE_REVIEWER` | acceptance test | yes for the review-request trigger | none | GitHub login, or a team name or slug, whose review request starts a run. Without it only `/acceptance` on a comment starts one. Do not put this account in `CODEOWNERS`. |
-| `PITCREW_ALLOW_PUBLIC_ACCEPTANCE` | acceptance test | no | unset | `true` lets the acceptance test run in a **public** repository. Off by default, and for a reason: see [threat-model.md](threat-model.md). |
+| `PITCREW_ACCEPTANCE_ALLOW_PUBLIC` | acceptance test | no | unset | `true` lets the acceptance test run in a **public** repository. Off by default, and for a reason: see [threat-model.md](threat-model.md). |
 
 ## Secrets
 
@@ -44,11 +44,11 @@ use; what matters is which workflow input you pass them to.
 | --- | --- | --- | --- | --- |
 | `PITCREW_LLM_API_KEY` | `api-key` | all | yes | Key for the OpenAI-compatible endpoint. Reaches OpenCode as an environment variable and never passes through a step output. |
 | `PITCREW_APP_PRIVATE_KEY` | `app-private-key` | all | no | Private key of the GitHub App in `PITCREW_APP_ID`. |
-| `PITCREW_TARGET_USERNAME` | `target-username` | acceptance test | no | Username or e-mail for the application under test. When empty, the agent demonstrates what is reachable without an account and records the rest as `not-demonstrable`, with the reason. |
-| `PITCREW_TARGET_PASSWORD` | `target-password` | acceptance test | no | Password for the application under test. |
+| `PITCREW_ACCEPTANCE_TARGET_USERNAME` | `target-username` | acceptance test | no | Username or e-mail for the application under test. When empty, the agent demonstrates what is reachable without an account and records the rest as `not-demonstrable`, with the reason. |
+| `PITCREW_ACCEPTANCE_TARGET_PASSWORD` | `target-password` | acceptance test | no | Password for the application under test. |
 
-The two target credentials reach the agent as `PITCREW_TARGET_USERNAME` and
-`PITCREW_TARGET_PASSWORD` in its own environment. They are deliberately not substituted into the
+The two target credentials reach the agent as `PITCREW_ACCEPTANCE_TARGET_USERNAME` and
+`PITCREW_ACCEPTANCE_TARGET_PASSWORD` in its own environment. They are deliberately not substituted into the
 prompt, because a prompt is echoed into the run log. The agent that needs them has a shell and reads
 them itself.
 
@@ -118,8 +118,8 @@ request are governed by the issues permission.
 | --- | --- | --- | --- |
 | `model` | string | `PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST`, then `PITCREW_LLM_API_MODEL` | Model id. |
 | `api-base-url` | string | `PITCREW_LLM_API_BASE_URL` | OpenAI-compatible endpoint. |
-| `target-url` | string | `PITCREW_TARGET_URL` | The deployed application to drive. |
-| `target-health-url` | string | `PITCREW_TARGET_HEALTH_URL` | Endpoint naming the deployed commit. |
+| `target-url` | string | `PITCREW_ACCEPTANCE_TARGET_URL` | The deployed application to drive. |
+| `target-health-url` | string | `PITCREW_ACCEPTANCE_TARGET_HEALTH_URL` | Endpoint naming the deployed commit. |
 | `output-language` | string | `PITCREW_OUTPUT_LANGUAGE`, then `English` | Language the agent writes in. |
 | `playwright-image` | string | `mcr.microsoft.com/playwright:v1.62.1-noble` | Container image with browsers, their libraries and the video encoder. |
 | `timeout-minutes` | number | `30` | Job timeout. |
@@ -209,7 +209,7 @@ Prompts refer to them by these names; nothing else is filled in.
 | `RUN_URL` | this workflow run |
 | `TARGET_URL` | the deployed application, when the manifest lists the `target` input |
 | `OUTPUT_LANGUAGE` | the language for the agent's own text |
-| `PITCREW_TARGET_USERNAME`, `PITCREW_TARGET_PASSWORD` | credentials for that application, read by the agent itself and never substituted into a prompt |
+| `PITCREW_ACCEPTANCE_TARGET_USERNAME`, `PITCREW_ACCEPTANCE_TARGET_PASSWORD` | credentials for that application, read by the agent itself and never substituted into a prompt |
 | `PLAYWRIGHT_MODULE` | where `recorder.mjs` finds Playwright inside the image |
 
 ## Variables the scripts read, for running one by hand

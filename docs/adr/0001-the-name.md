@@ -41,26 +41,42 @@ Naming surfaces:
 | repository, npm name | `pr-pitcrew` |
 | how it is used | `uses: RobYed/pr-pitcrew/.github/workflows/<agent>.yml@v1` |
 | prose, README title | PR Pitcrew |
-| variables and secrets | `PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`, `PITCREW_LLM_API_MODEL`, `PITCREW_TARGET_URL`, … |
+| variables and secrets | `PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`, `PITCREW_LLM_API_MODEL`, `PITCREW_ACCEPTANCE_TARGET_URL`, … |
 | check names | `Pitcrew / Bug Review` |
 | comment markers | `<!-- pitcrew:summary:<slug> -->`, `<!-- pitcrew:finding -->` |
 | working directory | `.pitcrew-run/` |
 | slash commands | unchanged: `/review`, `/security`, `/acceptance` - they name the agent, not the package |
 
 The `pr-` prefix stays out of the variables, or every one of them would read
-`PR_PITCREW_TARGET_HEALTH_URL`.
+`PR_PITCREW_ACCEPTANCE_TARGET_HEALTH_URL`.
 
-Within `PITCREW_*` there is a second grouping, and it is deliberate. **Everything that configures the
-model provider carries `LLM_API_`**: `PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`,
-`PITCREW_LLM_API_MODEL`, and the per-agent `PITCREW_LLM_API_MODEL_<AGENT>`. Everything else does not:
-`PITCREW_TARGET_URL`, `PITCREW_FAIL_ON`, `PITCREW_ACCEPTANCE_REVIEWER`.
+Within `PITCREW_*` the second segment sorts a variable into one of three families, and the sorting is
+deliberate:
 
-Two names in this package mean "base URL" and two mean "credentials", and they point at completely
-different things - one pair at the model provider, the other at the application the acceptance test
-drives. `PITCREW_BASE_URL` next to `PITCREW_TARGET_URL` invites somebody to put the app's address in
+| Segment | What it configures | Examples |
+| --- | --- | --- |
+| `LLM_API_` | the model provider, for every agent | `PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`, `PITCREW_LLM_API_MODEL`, `PITCREW_LLM_API_MODEL_<AGENT>` |
+| `ACCEPTANCE_` | the acceptance test only | `PITCREW_ACCEPTANCE_TARGET_URL`, `PITCREW_ACCEPTANCE_TARGET_USERNAME`, `PITCREW_ACCEPTANCE_REVIEWER`, `PITCREW_ACCEPTANCE_ALLOW_PUBLIC` |
+| neither | every agent, and not the provider | `PITCREW_FAIL_ON`, `PITCREW_OUTPUT_LANGUAGE` |
+
+Two problems made this worth the extra syllables.
+
+**Two names mean "base URL" and two mean "credentials", pointing at completely different things** -
+one pair at the model provider, the other at the application the acceptance test drives. A bare
+`PITCREW_BASE_URL` next to a bare `PITCREW_TARGET_URL` invites somebody to put the app's address in
 the wrong one, and the failure is a confusing HTTP error from a host that was never a model endpoint.
-Sorting them into two families makes that mistake visible while typing rather than while reading a
-run log. The `LLM_API_` segment also means one `grep` finds every place a provider is configured.
+
+**A repository that runs only the two diff reviews should be able to see, from the name alone, that
+half the table does not concern it.** `PITCREW_TARGET_URL` reads like something every agent needs.
+`PITCREW_ACCEPTANCE_TARGET_URL` does not.
+
+The per-agent model override stays in the `LLM_API_` family rather than moving into `ACCEPTANCE_`
+(`PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST`, not `PITCREW_ACCEPTANCE_MODEL`). It is one of three
+variables that differ only in which agent they name, and separating one of them from its siblings
+would hide the pattern to gain a prefix.
+
+The segments also mean one `grep` finds every place a provider is configured, and another finds
+everything the acceptance test needs.
 
 ## Consequences
 

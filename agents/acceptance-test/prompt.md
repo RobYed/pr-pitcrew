@@ -24,7 +24,7 @@ corrections — what you did, what you saw, what you expected.
 | `WORK_DIR` | write your scripts here - it is inside the checkout but git-ignored; write nowhere else |
 | `REPORT_FILE` | where your report goes |
 | `RUN_URL` | this workflow run, for linking |
-| `PITCREW_TARGET_USERNAME`, `PITCREW_TARGET_PASSWORD` | credentials for the app, may be empty |
+| `PITCREW_ACCEPTANCE_TARGET_USERNAME`, `PITCREW_ACCEPTANCE_TARGET_PASSWORD` | credentials for the app, may be empty |
 
 The environment under test is shared and real. Keep the number of expensive operations small —
 anything that calls a paid service, sends mail, or writes data that outlives the run. One

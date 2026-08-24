@@ -36,14 +36,18 @@ First public release.
 
 ### Names
 
-Everything that configures the model provider carries `LLM_API_`:
-`PITCREW_LLM_API_KEY`, `PITCREW_LLM_API_BASE_URL`, `PITCREW_LLM_API_MODEL` and
-the per-agent `PITCREW_LLM_API_MODEL_<AGENT>`. Everything else does not:
-`PITCREW_TARGET_URL`, `PITCREW_FAIL_ON`, `PITCREW_ACCEPTANCE_REVIEWER`. Two names
-here mean "base URL" and two mean "credentials", pointing at the model provider
-and at the application under test respectively, so they are sorted into two
-families where the difference is visible while typing. See
-`docs/adr/0001-the-name.md`.
+Every variable and secret starts with `PITCREW_`, and the segment after it says
+which family it belongs to:
+
+- `PITCREW_LLM_API_*` configures the model provider, for every agent.
+- `PITCREW_ACCEPTANCE_*` configures the acceptance test, and nothing else.
+- Anything with neither segment applies to every agent: `PITCREW_FAIL_ON`,
+  `PITCREW_OUTPUT_LANGUAGE`.
+
+Two names in this package mean "base URL" and two mean "credentials", pointing
+at the model provider and at the application under test respectively, and a
+repository running only the two diff reviews should be able to see from a name
+that half the table does not concern it. See `docs/adr/0001-the-name.md`.
 
 ### Note for anyone migrating from the private bundle this grew out of
 
