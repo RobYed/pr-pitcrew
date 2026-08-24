@@ -3,8 +3,14 @@
 [![CI](https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml/badge.svg)](https://github.com/RobYed/pr-pitcrew/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A pit crew for your pull requests. Several specialists, each with one job, all at once, and the car
-leaves in better shape than it arrived.
+Three review agents for your pull requests, installed as GitHub Actions workflows and run on your
+own LLM endpoint. Open a pull request and it is read for bugs and for security defects, with each
+finding written as a comment on the line it is about. Ask for the third one and an agent with a
+browser drives your deployed app, walks the linked issue's acceptance criteria, and leaves the
+recording behind.
+
+A pit crew, then: several specialists, each with one job, all at once, and the car leaves in better
+shape than it arrived.
 
 Three of them ship today:
 
@@ -17,6 +23,46 @@ Three of them ship today:
 They run on [OpenCode](https://opencode.ai) inside **your** runner, against **your**
 OpenAI-compatible endpoint, with **your** key. No third-party service sits in between, and no model
 is preselected: which model reads your code is a decision you make with your provider.
+
+## What a pull request looks like with this installed
+
+**You push.** `Pitcrew / Bug Review` and `Pitcrew / Security Review` start on the new commits.
+Minutes later the diff carries comments where the defects are, and one summary comment above them:
+verdict, counts by severity, what was looked at. From `high` upward the check is red, and it stays
+red until somebody deals with the finding.
+
+**You push again.** Only the commits you added are reviewed, and a point one of the agents already
+made is not made a second time. What you fixed disappears; what you did not stays red.
+
+**You ask for the acceptance test.** You request a review from the pitcrew account, which is the
+gesture a human reviewer gets, and an agent with a browser drives your deployed app: it takes the
+acceptance criteria from the linked issue, verbatim, does the steps by hand, and records them. What lands on
+the pull request is a table of those criteria, each marked met or not and stamped with the moment it
+happens in the recording, above a link to the video and the screenshots in the run's artifacts.
+
+**Whatever a verdict does not tell you** is in the run summary: every tool call the agent made, its
+input, and what the agent wrote.
+
+## Who this is for
+
+**A team without a spare reviewer.** Two people, or one, and every pull request waits for the only
+other person who knows the code. The two diff reviews do not replace that person; they take the
+first pass, so what reaches them is the part that needs a human.
+
+**A team whose review bot bills more than it explains.** A hosted service charges per seat, per
+repository or per review, and what was done for that money is not visible from the outside. Here the
+bill arrives from your own provider, per token, for a model you picked, and the run summary shows
+the work the verdict came from.
+
+**A team that has to answer for where the code goes.** Your runner, your endpoint, your key: the
+only outside party that sees the diff is the provider you picked, and the workflow that sends it is
+seventeen lines you can read. When that question comes from a customer or an audit, the answer is
+yours to give rather than a vendor's.
+
+**A team whose issues carry acceptance criteria.** If the criteria are written down and there is a
+deployed environment to point at, the acceptance test is where this pays off most: the manual
+walk-through somebody does before every merge becomes a table on the pull request and a video to
+check it against.
 
 ## Quickstart
 
@@ -61,7 +107,7 @@ Open a pull request. There is no fourth step.
 `examples/` has the same file for all three agents. Enable one, two or all three; none of them needs
 the others.
 
-## What you get
+## How the output behaves
 
 **Findings at the code, not in a wall of text.** Each finding becomes a comment on the line it is
 about. Above them, one summary comment in a frame the package writes: heading, verdict, counts by
@@ -105,6 +151,10 @@ operations against a real environment. So **it does not start itself**. It start
 requests a review from the account in `PITCREW_ACCEPTANCE_REVIEWER`, which is the same gesture a
 human reviewer gets. Removing that reviewer and adding them back is how you ask for a second run.
 `/acceptance` in a comment does the same.
+
+It leaves one comment behind: the criteria from the issue, each marked met or not and stamped with
+the moment it happens in the recording, and a link to the video and the screenshots, which are
+uploaded with the run.
 
 It needs `PITCREW_ACCEPTANCE_TARGET_URL` (the deployed app), and takes credentials for it if it has
 a login. Everything it needs is named `PITCREW_ACCEPTANCE_*`, so a repository running only the two
