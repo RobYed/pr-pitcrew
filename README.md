@@ -122,6 +122,8 @@ the security review is installed exactly like this one, and the acceptance test 
 starts it and in two variables of its own, which the section below explains. Beyond the endpoint,
 the key and the model, they share nothing, so enable one, two or all three.
 
+See [`docs/configuration.md`](docs/configuration.md) for the full configuration options.
+
 ## How the output behaves
 
 **Findings at the code, not in a wall of text.** Each finding becomes a comment on the line it is
