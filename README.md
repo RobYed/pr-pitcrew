@@ -55,26 +55,6 @@ happens in the recording, above a link to the video and the screenshots in the r
 **Whatever a verdict does not tell you** is in the run summary: every tool call the agent made, its
 input, and what the agent wrote.
 
-## Who this is for
-
-**A team whose review bot bills more than it explains.** A hosted service charges per seat, per
-repository or per review, and what was done for that money is not visible from the outside. Here the
-bill arrives from your own provider, per token, for a model you picked, and the run summary shows
-the work the verdict came from.
-
-**A team that has to answer for where the code goes.** Your runner, your endpoint, your key: the
-only outside party that sees the diff is the provider you picked, and the workflow that sends it is
-seventeen lines you can read. When that question comes from a customer or an audit, the answer is
-yours to give rather than a vendor's.
-
-**A team whose issues carry acceptance criteria.** If the criteria are written down and there is a
-deployed environment to point at, the acceptance test is where this pays off most: the manual
-walk-through somebody does before every merge becomes a table on the pull request and a video to
-check it against.
-
-**A team who wants to skip human review - YOLO!.** Review takes developer's time. You trust AI outputs 
-without any fear. Speed matters more than perfection. What should go wrong?!
-
 ## Quickstart
 
 One file per agent, and that file is the whole of the agent's installation: the scripts, the prompts
@@ -124,33 +104,43 @@ the key and the model, they share nothing, so enable one, two or all three.
 
 See [`docs/configuration.md`](docs/configuration.md) for the full configuration options.
 
-## How the output behaves
+## Who this is for
 
-**Findings at the code, not in a wall of text.** Each finding becomes a comment on the line it is
-about. Above them, one summary comment in a frame the package writes: heading, verdict, counts by
-severity, scope, links. The shape of a comment tells a reader what happened before they read a word
-of it.
+**A team whose review bot bills more than it explains.** A hosted service charges per seat, per
+repository or per review, and what was done for that money is not visible from the outside. Here the
+bill arrives from your own provider, per token, for a model you picked, and the run summary shows
+the work the verdict came from.
 
-**A check that can be red.** `PITCREW_FAIL_ON` decides the severity from which findings fail the
-build; `high` by default, `never` to keep the agents advisory. A finding stays red until somebody
-changes the line or resolves the thread. The next push cannot turn it green by not mentioning it
-again.
+**A team that has to answer for where the code goes.** Your runner, your endpoint, your key: the
+only outside party that sees the diff is the provider you picked, and the workflow that sends it is
+seventeen lines you can read. When that question comes from a customer or an audit, the answer is
+yours to give rather than a vendor's.
 
-**No repetition.** A push is reviewed as the commits it added, not as the whole pull request again,
-and a finding is dropped when one of the package's own earlier comments already made that point
-within two lines of it. Otherwise a pull request never converges: fix, review, fix, review.
+**A team whose issues carry acceptance criteria.** If the criteria are written down and there is a
+deployed environment to point at, the acceptance test is where this pays off most: the manual
+walk-through somebody does before every merge becomes a table on the pull request and a video to
+check it against.
 
-**A record of the work.** Every run appends its own transcript to the run summary: one line per tool
+**A team who wants to skip human review - YOLO!.** Review takes developer's time. You trust AI outputs 
+without any fear. Speed matters more than perfection. What should go wrong?!
+
+## Good to know
+
+### Transcript in the run summary
+
+Every run appends its own transcript to the run summary: one line per tool
 call, its input behind a fold, and what the agent wrote. The verdict and the work are different
 questions.
 
-**Read-only by construction.** The two review agents have no shell, no `webfetch`, no `websearch`
+### Read-only by construction
+
+The two review agents have no shell, no `webfetch`, no `websearch`
 and no sub-agents; they may write only inside a git-ignored run directory. That is not a promise 
 made to the model in a prompt, it is a permission profile that ships with this package, so a pull 
 request cannot grant its own reviewer a shell even by editing every file it can reach. 
 See [`docs/threat-model.md`](docs/threat-model.md).
 
-## Updating, and pinning
+### Updating, and pinning
 
 `@v1` is a moving tag: a fix here reaches you without you touching a file. If you would rather
 decide when that happens, pin the commit instead and let Dependabot propose the bumps:
@@ -161,7 +151,17 @@ uses: RobYed/pr-pitcrew/.github/workflows/bug-review.yml@a1b2c3d4...  # v1.0.0
 
 Both are supported. `@v1` is the convenient one, a SHA is the deliberate one.
 
-## The acceptance test agent
+### Your project's rules are the review's rules
+
+The agents read your repository's `AGENTS.md` (or `CLAUDE.md`) on their own, because the runtime
+loads it, and the prompts tell them a rule written there outranks their general expectations about
+how such code is usually written. Nothing has to be written down twice, and nothing drifts: it is
+the same file your own coding agent reads.
+
+For what belongs to one agent and is not a project rule, append to its prompt rather than forking
+it - see [`docs/adding-an-agent.md`](docs/adding-an-agent.md).
+
+### The acceptance test agent
 
 This one costs more than the other two: a container, a browser, up to half an hour, and real
 operations against a real environment. So **it does not start itself**. It starts when somebody
@@ -181,16 +181,6 @@ the pull request comments that reach it. See
 [`examples/acceptance-test.yml`](examples/acceptance-test.yml) and
 [`docs/threat-model.md`](docs/threat-model.md).
 
-## Your project's rules are the review's rules
-
-The agents read your repository's `AGENTS.md` (or `CLAUDE.md`) on their own, because the runtime
-loads it, and the prompts tell them a rule written there outranks their general expectations about
-how such code is usually written. Nothing has to be written down twice, and nothing drifts: it is
-the same file your own coding agent reads.
-
-For what belongs to one agent and is not a project rule, append to its prompt rather than forking
-it - see [`docs/adding-an-agent.md`](docs/adding-an-agent.md).
-
 ## Documentation
 
 | | |
@@ -208,7 +198,6 @@ it - see [`docs/adding-an-agent.md`](docs/adding-an-agent.md).
   Playwright container both have.
 - An OpenAI-compatible endpoint and a key. Any provider: this package names no vendor, no host and
   no model.
-- Nothing to install. There are no npm dependencies, on purpose.
 
 ## Where this came from
 
