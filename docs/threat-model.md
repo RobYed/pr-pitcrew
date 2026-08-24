@@ -106,7 +106,7 @@ most of the value. The honest state of things:
 
 A reviewed, opt-in path for fork pull requests, with shell-less agents only and behind a GitHub
 environment with a required approver, is the obvious next step and is
-[tracked as an issue](https://github.com/RobYed/pr-pitcrew/issues). It is not in this release
+[tracked as issue #1](https://github.com/RobYed/pr-pitcrew/issues/1). It is not in this release
 because a convenient version of it would be worse than none: `pull_request_target` is the obvious
 answer and the dangerous one, and shipping it without the base-branch checkout for everything
 executable is the classic mistake with that event.
