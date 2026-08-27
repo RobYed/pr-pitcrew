@@ -93,6 +93,18 @@ Concretely:
 - The two review agents are unaffected by all of that and keep running in public repositories,
   because the analysis above holds for them: hostile text has nowhere to go.
 
+**A refusal is a norm here, not a wall.** One run met a broken rig - the browser driver was missing -
+and spent its whole budget looking for a way to obtain one: the npm registry, a writable directory,
+and finally `child_process`, *because* Node's child processes are not what the tool permissions
+cover. Its reasoning was correct. `profiles/browser.json` allows `bash`, so there was nothing to
+break.
+
+The prompt now says that a refusal is a final answer, that nothing is to be installed, fetched or
+repaired, and that a missing piece is a report rather than a task. Read that for what it is: an
+instruction to a model, which is a norm and not a boundary. What removed the reason to break it is
+`actions/check-browser`, which proves the browser before the model is called. The run stops in
+seconds instead of leaving an agent to improvise around a rig that cannot work.
+
 ## Forks
 
 **Fork pull requests are refused, not sandboxed.**

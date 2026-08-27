@@ -37,7 +37,7 @@ const criterion = {
 
 export default {
   description:
-    'Submit the finished review. You MUST call this tool before you reply — even when there is nothing to report. It writes the structured result this run publishes (verdict, summary, findings or criteria). A reply without this call is published as a failed review. Empty findings or criteria arrays are valid.',
+    'Submit what this run publishes (verdict, summary, findings or criteria). Call it as soon as you have something, and again whenever it changes — the last call is the one that gets published. You MUST call it at least once before you reply, even when there is nothing to report: a reply without it is published as a failed review. Empty findings or criteria arrays are valid.',
   args: {
     verdict: {
       type: 'string',
@@ -78,6 +78,6 @@ export default {
 
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    return `Wrote the report to ${target}. Now reply with one sentence.`;
+    return `Wrote the report to ${target}. Call this tool again if anything changes; reply when you are done.`;
   },
 };

@@ -1,0 +1,64 @@
+name: Check the browser
+description: Proves that a browser can be started before the run spends anything on a model.
+
+# The image brings the browsers; the recorder needs the driver that speaks to
+# them. One run had the first without the second, and because nothing checked,
+# the agent met the gap itself: half an hour of a job that held the model key
+# went into fetching a package, looking for a writable directory, and reasoning
+# about ways around its own permissions. No verdict was ever written.
+#
+# This is the deployment check's counterpart. It resolves the driver, starts
+# Chromium with it, and exports the path it proved. A failure ends the job in
+# seconds with one sentence, on the pull request as well as in the log.
+#
+# Nothing is installed here. A driver fetched at run time would land in the job
+# that holds the model key and the credentials of the environment under test.
+
+inputs:
+  playwright-image:
+    description: The image this job runs in. Named in the failure message.
+    required: false
+    default: ''
+  playwright-module:
+    description: >-
+      Path to the Playwright package, when your image puts it somewhere of its
+      own. When set it must work: nothing is searched past it.
+    required: false
+    default: ''
+  agent:
+    description: The agent whose report frame a failure is published in.
+    required: false
+    default: acceptance-test
+  github-token:
+    description: Token used to comment when the check fails.
+    required: true
+  pr-number:
+    description: The pull request the failure is published on.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve the driver and start a browser with it
+      id: browser
+      shell: bash
+      env:
+        PLAYWRIGHT_IMAGE: ${{ inputs.playwright-image }}
+        PLAYWRIGHT_MODULE: ${{ inputs.playwright-module }}
+        HARNESS_FAILURE_FILE: ${{ runner.temp }}/pitcrew-harness-failure.txt
+      run: node "$GITHUB_ACTION_PATH/../../scripts/check-browser.mjs"
+
+    # A red check whose reason is one click away is a reason nobody reads. The
+    # sentence above becomes a report, and the report goes through the same
+    # frame every run uses. The job stays failed - this step only makes it say so.
+    - name: Say on the pull request that the run stopped here
+      if: failure()
+      shell: bash
+      env:
+        AGENT: ${{ inputs.agent }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
+        HARNESS_FAILURE_FILE: ${{ runner.temp }}/pitcrew-harness-failure.txt
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: node "$GITHUB_ACTION_PATH/../../scripts/report-harness-failure.mjs"

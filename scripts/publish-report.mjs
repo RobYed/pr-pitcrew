@@ -694,6 +694,10 @@ function countLine(report) {
     return `**${met}/${counted} criteria met**${rest > 0 ? ` · ⚠️ ${rest} not demonstrated or unmet` : ''}`;
   }
 
+  // A run that deals in criteria and has none demonstrated nothing, which is
+  // not the same as finding nothing. This is what a harness failure reads as.
+  if (reportKind === 'criteria') return '**No criterion was demonstrated.**';
+
   if (report.findings.length === 0) return '**No findings.**';
 
   const bySeverity = ['high', 'medium', 'low']

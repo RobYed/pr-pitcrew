@@ -16,7 +16,11 @@
  * Playwright is not installed here. In the official Playwright image the package
  * sits outside the project, so it is resolved through NODE_PATH via `require`,
  * which - unlike `import` - honours that variable. PLAYWRIGHT_MODULE overrides
- * the lookup with an absolute path.
+ * the lookup with an absolute path, and actions/check-browser sets it to the
+ * package it proved before the run started. If you are the maintainer and the
+ * lookup below fails: use an image that ships the driver next to the browsers,
+ * or set PLAYWRIGHT_MODULE. The message the agent gets says something else on
+ * purpose - see loadPlaywright().
  */
 
 import { createRequire } from 'node:module';
@@ -37,10 +41,15 @@ function loadPlaywright() {
     }
   }
 
+  // What the agent reads, and it is an instruction rather than operator advice.
+  // The previous text named NODE_PATH and PLAYWRIGHT_MODULE, which a model with
+  // a shell reads as a to-do list: one run spent half an hour looking for a way
+  // to install a driver instead of reporting that it could not test anything.
+  // The resolution details are in the header, where a maintainer reads them.
   throw new Error(
-    `Playwright could not be loaded. Tried ${failures.join(' | ')}. ` +
-      'Inside the Playwright image set NODE_PATH=/ms-playwright-agent/node_modules, ' +
-      'or point PLAYWRIGHT_MODULE at the package.',
+    'The browser is unavailable, so this run can demonstrate nothing. Do not install, fetch or repair ' +
+      'anything: call write_report now with every criterion as `not-demonstrable`, name the missing browser ' +
+      `in the evidence, and stop. (Tried ${failures.join(' | ')}.)`,
   );
 }
 
@@ -141,6 +150,74 @@ export async function startRun(options = {}) {
     /** A line of your own in the console log, for things the browser does not say. */
     note(text) {
       consoleLines.push(`[${stamp()}] note: ${text}`);
+    },
+
+    /**
+     * The roles and accessible names on the page, as YAML.
+     *
+     * Read it before you write a selector. A settings page carries more than
+     * one switch and more than one dropdown, and `button[role="switch"]` picks
+     * none of them; the name that tells them apart is in here.
+     */
+    async outline(target = page) {
+      const source = typeof target?.ariaSnapshot === 'function' ? target : target?.locator?.('body');
+      if (typeof source?.ariaSnapshot !== 'function') {
+        return '(This Playwright build has no aria snapshot, so there is no outline. Use accessible names all the same.)';
+      }
+      try {
+        return await source.ariaSnapshot();
+      } catch (error) {
+        return `(The outline could not be taken: ${error.message.split('\n')[0]})`;
+      }
+    },
+
+    /**
+     * The one element a locator names, or an error that names the candidates.
+     *
+     * Playwright's strict mode already refuses an ambiguous locator, but its
+     * message says how many matched rather than which. This asks each candidate
+     * for its accessible name and puts those in the error, so the next attempt
+     * is a narrower query rather than a guess.
+     *
+     * It never takes the first match: demonstrating the wrong switch is worse
+     * than a criterion nobody could demonstrate.
+     */
+    async pick(locator, { state = 'visible', timeout } = {}) {
+      try {
+        await locator.waitFor(timeout === undefined ? { state } : { state, timeout });
+        return locator;
+      } catch (error) {
+        if (!/strict mode violation/i.test(error.message ?? '')) throw error;
+
+        const count = await locator.count().catch(() => 0);
+        const names = [];
+        for (let index = 0; index < Math.min(count, 10); index += 1) {
+          const name = await locator
+            .nth(index)
+            .evaluate(node =>
+              (
+                node.getAttribute('aria-label') ||
+                node.getAttribute('title') ||
+                node.getAttribute('placeholder') ||
+                node.textContent ||
+                ''
+              )
+                .trim()
+                .slice(0, 80),
+            )
+            .catch(() => '');
+          names.push(name ? `"${name}"` : '(no accessible name)');
+        }
+        if (count > names.length) names.push(`and ${count - names.length} more`);
+
+        const list = names.join(', ');
+        consoleLines.push(`[${stamp()}] ambiguous locator: ${count} matches - ${list}`);
+        console.log(`Ambiguous locator: ${count} matches - ${list}`);
+        throw new Error(
+          `This locator matches ${count} elements, so it names none of them: ${list}. ` +
+            'Ask for one by its accessible name, or scope the query to the region it is in.',
+        );
+      }
     },
 
     /**

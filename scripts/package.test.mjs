@@ -206,6 +206,18 @@ describe('the agent action', () => {
     }
   });
 
+  it('stops the runtime before the job does, so the report still gets published', () => {
+    // A step of a composite action cannot carry `timeout-minutes`, so the
+    // command carries it. Without this the job's own timeout kills the run
+    // mid-turn and takes the recovery, the artifact and the comment with it.
+    assert.match(cli, /timeout --signal=INT [^\n]*"\$PITCREW_AGENT_TIMEOUT"/);
+    assert.match(cli, /status" -eq 124/, 'a run stopped by the timeout is not told apart from a failed one');
+
+    const inputs = steps.find(step => step.includes('Hand the agent its inputs'));
+    assert.ok(inputs, 'no step hands the agent its inputs');
+    assert.match(inputs, /DEADLINE=/, 'the agent is never told when it has to stop');
+  });
+
   it('installs the runtime version this package pins on the path that installs it itself', () => {
     const install = steps.find(step => step.includes('opencode.ai/install'));
     assert.ok(install, 'nothing installs the OpenCode runtime for the CLI path');
@@ -232,10 +244,38 @@ describe('the acceptance test, which is the agent with a shell', () => {
     );
   });
 
+  it('proves the browser before it spends anything on a model', () => {
+    // The image brings the browsers, the recorder needs the driver, and one run
+    // had the first without the second: the agent spent half an hour hunting
+    // for a way around its own permissions and wrote no verdict at all.
+    const browser = workflow.indexOf('actions/check-browser@main');
+    const agent = workflow.indexOf('actions/agent@main');
+    assert.ok(browser > 0, 'nothing checks that a browser can be started');
+    assert.ok(browser < agent, 'the browser is checked after the agent has already run');
+  });
+
+  it('gives the agent the job\'s own timeout, so it can stop before it is killed', () => {
+    assert.match(workflow, /timeout-minutes: \$\{\{ inputs\.timeout-minutes \}\}[\s\S]*timeout-minutes: \$\{\{ inputs\.timeout-minutes \}\}/);
+  });
+
   it('still refuses a public repository', () => {
     // The line that actually matters, and the one a variable can turn off.
     assert.match(workflow, /PITCREW_ACCEPTANCE_ALLOW_PUBLIC != 'true'/);
   });
+});
+
+describe('the checks that run before the agent', () => {
+  // A red check whose reason is one click away is a reason nobody reads. Both
+  // of these end the job in seconds, and both leave the sentence where the
+  // person who asked for the run is looking.
+  for (const name of ['check-browser', 'check-deployment']) {
+    it(`${name} publishes the failure it stopped the run with`, () => {
+      const action = read('actions', name, 'action.yml');
+      assert.match(action, /HARNESS_FAILURE_FILE/, 'the failure message goes nowhere');
+      assert.match(action, /report-harness-failure\.mjs/, 'the failure never reaches the pull request');
+      assert.match(action, /if: failure\(\)/);
+    });
+  }
 });
 
 describe('self-references', () => {

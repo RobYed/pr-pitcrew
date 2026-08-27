@@ -174,7 +174,12 @@ human reviewer gets. Removing that reviewer and adding them back is how you ask 
 
 It leaves one comment behind: the criteria from the issue, each marked met or not and stamped with
 the moment it happens in the recording, and a link to the video and the screenshots, which are
-uploaded with the run.
+uploaded with the run. The report is written as the walk-through goes, so a run that stops halfway
+still publishes what it proved.
+
+Before a model is called, the job starts a browser and proves it works. A rig that cannot drive
+anything fails in seconds, with the reason on the pull request, rather than half an hour later with
+nothing to show.
 
 It needs `PITCREW_ACCEPTANCE_TARGET_URL` (the deployed app), and takes credentials for it if it has
 a login. Everything it needs is named `PITCREW_ACCEPTANCE_*`, so a repository running only the two
