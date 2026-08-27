@@ -138,10 +138,11 @@ jobs:
           fetch-depth: 0
 
       # This agent has a shell, the model key and the credentials of the
-      # environment under test - and the runtime puts the pull request's title,
-      # body and comments into its prompt. In a private repository only people
-      # who can already push are able to write those. In a public one anybody
-      # with a GitHub account can, and their words would reach that shell.
+      # environment under test - and it works from the linked issue, verbatim,
+      # plus the pull request's title, body and comments when a comment started
+      # the run. In a private repository only people who can already push are
+      # able to write those. In a public one anybody with a GitHub account can,
+      # and their words would reach that shell.
       #
       # The two diff reviews are unaffected and keep running in public
       # repositories: no shell, no `webfetch`, no `task`, and no way to read the

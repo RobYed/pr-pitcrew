@@ -97,9 +97,7 @@ heredoc delimiter of their own, so a stray newline in a secret cannot forge a va
 **Build the configuration and the prompt** with `scripts/build-config.mjs`. See the next two
 sections.
 
-**Run the agent** through the pinned OpenCode GitHub action, with `use_github_token: true` and
-`share: 'false'`. Sharing would upload the session transcript to opencode.ai, and somebody else's
-diff has no business leaving the runner.
+**Run the agent**, through one of two doors. See "Two ways into the runtime" below.
 
 **Recover the report**, if the agent did not write one. See "A run that reviewed nothing".
 
@@ -112,11 +110,58 @@ exactly when the video and the logs are worth having.
 Two properties of the checkout that precedes all this are worth stating, because both look like
 mistakes:
 
-- **No `persist-credentials: false`.** OpenCode fetches the pull request branch itself and, with
-  `use_github_token`, installs none of its own credentials; in a private repository that fetch needs
-  the ones checkout leaves behind. They cannot push, because the job runs with `contents: read`.
+- **No `persist-credentials: false`.** On a comment-triggered run OpenCode fetches the pull request
+  branch itself and, with `use_github_token`, installs none of its own credentials; in a private
+  repository that fetch needs the ones checkout leaves behind. They cannot push, because the job runs
+  with `contents: read`.
 - **`fetch-depth: 0`.** The agent reads around the diff, and a shallow clone does not have the base
   branch to read.
+
+## Two ways into the runtime
+
+A `pull_request` runs the **OpenCode CLI**. Everything else - in practice the `/review`, `/security`
+and `/acceptance` comments - runs the **OpenCode GitHub action**. The event decides, never the actor.
+
+The reason is a failure that had no workaround on the consumer's side.
+`opencode github run` refuses to start unless the *triggering actor* has write access to the
+repository, and GitHub's collaborator API answers `none` for every GitHub App bot, because a bot is
+not a collaborator:
+
+```
+Asserting permissions for user cursor[bot]...
+  permission: none
+User cursor[bot] does not have write permissions
+```
+
+A pull request opened or pushed by `cursor[bot]`, `github-actions[bot]` or any other app was
+therefore never reviewed: the check went red before the model saw the diff. On the `pull_request`
+path that check was not what carried the weight anyway - a fork gets no secrets and is refused by
+`assert-same-repo.mjs`, so the head branch lives in this repository and somebody with write access
+pushed it. [ADR 9](adr/0009-the-pull-request-path-runs-the-cli.md) is the whole argument, including
+what it costs.
+
+On the CLI path the action's four jobs are answered like this:
+
+- **The checkout is what the agent sees.** `actions/checkout` has already put `refs/pull/N/merge` in
+  the workspace - the change as it would land on the base branch, rather than the head commit.
+- **The prompt is only what this package put in it**: the diff, and for the acceptance test the
+  linked issue. The pull request's title, body and comments are not assembled into it; on the comment
+  path they still are.
+- **`OPENCODE_DISABLE_PROJECT_CONFIG` is set**, on both paths, so the branch under review contributes
+  no `opencode.json`, no `AGENTS.md` as system instructions and no `.opencode/tool/*.js`. See
+  [threat-model.md](threat-model.md).
+- **Sharing is refused in the configuration** (`"share": "disabled"`) rather than through an action
+  input the CLI does not have. Sharing would upload the session transcript to opencode.ai, and
+  somebody else's diff has no business leaving the runner.
+
+Two smaller differences. The runtime is installed by a step of this action on that path, with the
+same installer and the same pinned `VERSION` the wrapper action would use. And the repository token
+is not in the environment of the process that reads the diff: the CLI talks to no GitHub API, and
+everything on the pull request is published by the steps after it.
+
+The prompt reaches the CLI on **stdin**, not as an argument: `opencode run` re-quotes any argument
+that contains a space, so a prompt passed on the command line would arrive at the model wrapped in
+quotation marks with its own escaped.
 
 ## The configuration comes from this package, never from the repository under review
 
@@ -142,6 +187,7 @@ What is generated looks like this:
       "models": { "<the model>": { "name": "<the model>" } }
     }
   },
+  "share": "disabled",
   "default_agent": "<the agent>",
   "model": "llm/<the model>",
   "agent": { "<the agent>": { "mode": "primary", "temperature": 0.1, "permission": { … } } }
@@ -181,6 +227,10 @@ So the agent is selected by `OPENCODE_CONFIG_CONTENT`, which the composite actio
 generated configuration with `default_agent` in it. Configurations are merged rather than replaced,
 and this inline one outranks anything the runtime would otherwise read from the checked-out branch.
 The `agent` input is still passed, for the day it starts working again.
+
+On the `pull_request` path there is a second belt: the CLI honours `--agent`, and the action names
+the agent there explicitly. `default_agent` stays in the configuration, so if the runtime ever
+declined the flag the fallback would be the same agent rather than `build`.
 
 The lesson is more general than the bug: **a permission that never applies looks exactly like one
 that does.** If a run behaves as though no permission applied, check the job log - it prints

@@ -79,11 +79,12 @@ jobs:
       issues: write
 
     steps:
-      # No `persist-credentials: false` here, on purpose. OpenCode fetches the
-      # pull request branch itself and, with `use_github_token`, installs no
-      # credentials of its own - in a private repository that fetch needs the
-      # ones this step leaves behind. They cannot push: the job has
-      # `contents: read`.
+      # No `persist-credentials: false` here, on purpose. On a comment-triggered
+      # run OpenCode fetches the pull request branch itself and, with
+      # `use_github_token`, installs no credentials of its own - in a private
+      # repository that fetch needs the ones this step leaves behind. They
+      # cannot push: the job has `contents: read`. On `pull_request` nothing is
+      # fetched; what this step checked out is what the agent reads.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The agent diffs against the base branch, which a shallow clone lacks.

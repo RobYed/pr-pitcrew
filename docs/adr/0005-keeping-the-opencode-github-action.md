@@ -1,6 +1,8 @@
 # 5. The runtime is invoked through the OpenCode GitHub action, not the CLI
 
-Status: accepted, 2026-08-24. Revisit if a fourth agent needs a trigger the action rejects.
+Status: accepted, 2026-08-24. Superseded for the `pull_request` path by
+[ADR 9](0009-the-pull-request-path-runs-the-cli.md), 2026-08-27; the comment triggers still run through
+the action. Revisit the rest if a fourth agent needs a trigger the action rejects.
 
 ## Context
 

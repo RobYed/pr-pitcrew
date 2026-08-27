@@ -58,9 +58,10 @@ With the runner's built-in `GITHUB_TOKEN`, comments are posted by `github-action
 name cannot be changed. To use your own:
 
 1. Create a GitHub App with the permissions **Contents: read**, **Pull requests: write**, **Issues:
-   write**, **Metadata: read** and **Administration: read**. The last one is not optional: before
-   every run OpenCode checks whether the triggering user may write to the repository, and that check
-   reads collaborator permissions.
+   write** and **Metadata: read**. Add **Administration: read** if you use the comment triggers:
+   there OpenCode checks whether the commenter may write to the repository, and that check reads
+   collaborator permissions. A `pull_request` run does not go through it - see
+   [threat-model.md](threat-model.md), "Who may trigger a run".
 2. Install it on the repository and generate a private key.
 3. Set `PITCREW_APP_ID` and pass the key as `app-private-key`.
 

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A pull request opened or pushed by a GitHub App bot is reviewed again. Every
+  run went through `opencode github run`, which refuses to start unless the
+  triggering actor has write access - and GitHub's collaborator API answers
+  `none` for every bot account, because a bot is not a collaborator. Pull
+  requests from `cursor[bot]`, `github-actions[bot]` and their kind therefore
+  ended with `permission: none` and a red check before the model saw the diff.
+  A `pull_request` now runs through the OpenCode CLI, where that lookup does not
+  happen; the comment triggers keep the action, which is the right door for
+  them. What authorises a `pull_request` is unchanged: a fork gets no secrets
+  from GitHub and is refused by `assert-same-repo.mjs`, so the head branch lives
+  in the repository and somebody with write access pushed it. See
+  [ADR 9](docs/adr/0009-the-pull-request-path-runs-the-cli.md), and
+  `docs/threat-model.md` for the one thing this gives up and how to add it back.
 - A run whose agent step died before OpenCode had a session no longer publishes
   an invented `verdict: pass`. `ensure-report.mjs` asked for the report with
   `opencode run --continue`; with nothing to continue, that opens a *new*
@@ -17,6 +30,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a passed quality gate for a review that never ran. The recovery turn now needs
   a session id from `session list` before it spends anything, and a run without
   one is published as what it is: a run that reviewed nothing.
+
+### Changed
+
+- On a `pull_request`, the pull request's title, body and comments no longer
+  reach the prompt: the wrapper action assembled those, and nothing on that path
+  does now. The agent gets what this package fetched - the diff, and for the
+  acceptance test the linked issue. A comment-triggered run is unchanged.
+- On a `pull_request`, no comment appears on the pull request until the review
+  is published. The action posted a `[Working...]` placeholder and then the
+  agent's raw reply, which `publish-report.mjs` rewrote; now it posts its own
+  comment, which it already knew how to do.
+- The agent that runs is named on the command line (`--agent`) as well as
+  through `default_agent`, so agent selection no longer rests on one field the
+  runtime is free to ignore.
+
+### Security
+
+- The branch under review configures the runtime on neither path.
+  `OPENCODE_DISABLE_PROJECT_CONFIG` is set on every run, so an `opencode.json`,
+  an `AGENTS.md` as system instructions or a custom tool under `.opencode/` from
+  the head branch is not loaded - that last one being JavaScript imported into
+  the process holding the model key, for an agent that otherwise has no shell.
+  The agents still *read* your `AGENTS.md`: their prompts send them to it, and
+  now the transcript shows it happening. The report tool this package installs
+  in `~/.config/opencode/tools/` is unaffected.
+- On a `pull_request`, the repository token is no longer in the environment of
+  the process that reads the diff. The CLI talks to no GitHub API; everything on
+  the pull request is published by the steps after it.
+- Session sharing is refused in the generated configuration
+  (`"share": "disabled"`) rather than only through an action input the CLI does
+  not have.
 
 ## [1.0.0] - 2026-08-24
 

@@ -261,6 +261,15 @@ describe('buildConfig', () => {
     const built = buildConfig({ agent: 'a', profile: {}, model: 'm', temperature: 0, description: 'd' });
     assert.equal(built.permission.external_directory, 'deny');
   });
+
+  it('refuses session sharing in the configuration, not only in an action input', () => {
+    // `share: 'false'` is an input of the OpenCode action, and the comment
+    // trigger still passes it. The CLI has no such input: on the
+    // `pull_request` path this field is the only thing standing between
+    // somebody's diff and opencode.ai.
+    const built = buildConfig({ agent: 'a', profile: {}, model: 'm', temperature: 0, description: 'd' });
+    assert.equal(built.share, 'disabled');
+  });
 });
 
 describe('fillPrompt', () => {

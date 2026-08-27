@@ -136,6 +136,62 @@ describe('permission profiles', () => {
   });
 });
 
+describe('the agent action', () => {
+  // Comments first: every step here explains itself at length, and one of those
+  // paragraphs names `pull_request` in prose. Shell comments inside a `run:`
+  // block go with them, which costs these assertions nothing.
+  const action = read('actions', 'agent', 'action.yml')
+    .split('\n')
+    .filter(line => !/^\s*#/.test(line))
+    .join('\n');
+
+  // Steps of a composite action, split on the list marker they all start with.
+  const steps = action
+    .slice(action.indexOf('\n  steps:'))
+    .split(/\n {4}- /)
+    .slice(1);
+
+  const cli = steps.find(step => step.includes('opencode run'));
+  const wrapper = steps.find(step => step.includes('uses: anomalyco/opencode/github'));
+
+  it('runs a pull request through the CLI, and everything else through the action', () => {
+    // `opencode github run` asserts the *actor* has write access, and GitHub's
+    // collaborator API answers `none` for every GitHub App bot - so a pull
+    // request opened by one died before the model saw the diff. The event
+    // decides the path, not the actor: a bot-shaped carve-out would give the
+    // less trusted actor the shorter route.
+    assert.ok(cli, 'no step invokes the OpenCode CLI');
+    assert.ok(wrapper, 'no step invokes the OpenCode GitHub action');
+    assert.match(cli, /if: github\.event_name == 'pull_request'/);
+    assert.match(wrapper, /if: github\.event_name != 'pull_request'/);
+  });
+
+  it('names the agent on the CLI rather than trusting a fallback', () => {
+    assert.match(cli, /--agent/);
+  });
+
+  it('keeps the repository token out of the process that reads the diff', () => {
+    // The CLI talks to no API. Everything on the pull request is published by
+    // the steps after it, from their own environment.
+    assert.equal(cli.includes('GITHUB_TOKEN'), false, 'the CLI step carries a token it does not need');
+  });
+
+  it('lets the branch under review configure the runtime on neither path', () => {
+    // Without this, `opencode.json`, `AGENTS.md` and `.opencode/tool/*.js` come
+    // from the head branch - and that last one is JavaScript in the process
+    // holding the model key, for an agent that otherwise has no shell.
+    for (const [name, step] of [['CLI', cli], ['action', wrapper]]) {
+      assert.match(step, /OPENCODE_DISABLE_PROJECT_CONFIG: '1'/, `the ${name} step lets the branch configure the runtime`);
+    }
+  });
+
+  it('installs the runtime version this package pins on the path that installs it itself', () => {
+    const install = steps.find(step => step.includes('opencode.ai/install'));
+    assert.ok(install, 'nothing installs the OpenCode runtime for the CLI path');
+    assert.match(install, /VERSION: \$\{\{ inputs\.opencode-version \}\}/);
+  });
+});
+
 describe('self-references', () => {
   it('point at @main on the branch, so the package reviews its own pull requests with its own code', () => {
     for (const name of readdirSync(join(root, '.github/workflows'))) {

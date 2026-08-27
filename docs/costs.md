@@ -35,10 +35,11 @@ What drives the number, in order:
    comment deliberately re-reads everything.
 2. **The files the agent decides to read.** A review agent reads around the diff to check whether a
    suspicion is real. That is most of its input on a small diff, and it is not bounded.
-3. **`AGENTS.md` / `CLAUDE.md` and what they point at.** The runtime loads the project's rule file on
-   its own, and the prompts tell the agent to read it. A very long rule file is paid for on every
-   run.
-4. **The pull request's title, body and comments**, which the runtime adds to the prompt.
+3. **`AGENTS.md` / `CLAUDE.md` and what they point at.** The prompts send the review agents to the
+   project's rule file. A very long rule file is paid for on every run.
+4. **The pull request's title, body and comments**, which the runtime adds to the prompt on a
+   comment-triggered run. A `pull_request` does not pay for them; see
+   [`how-it-works.md`](how-it-works.md), "Two ways into the runtime".
 5. **The recovery turn**, if it happens. When an agent finishes without submitting a report, the
    session is read back and, only if the report cannot be recovered from it, one further turn is
    spent asking for the tool by name. Never a second review.
