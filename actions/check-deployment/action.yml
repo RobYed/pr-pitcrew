@@ -21,6 +21,10 @@ inputs:
   pr-number:
     description: The pull request whose commits should be on the deployment.
     required: true
+  agent:
+    description: The agent whose report frame a failure is published in.
+    required: false
+    default: acceptance-test
   attempts:
     description: How many times to ask before giving up.
     required: false
@@ -58,6 +62,7 @@ runs:
         MERGE_SHA: ${{ steps.commits.outputs.merge-sha }}
         ATTEMPTS: ${{ inputs.attempts }}
         INTERVAL: ${{ inputs.interval-seconds }}
+        HARNESS_FAILURE_FILE: ${{ runner.temp }}/pitcrew-harness-failure.txt
       run: |
         set -euo pipefail
 
@@ -95,5 +100,22 @@ runs:
           attempt=$((attempt + 1))
         done
 
-        echo "::error::$HEALTH_URL does not report this pull request's commit. Another deployment has taken the environment over, so nothing demonstrated here would be about this change."
+        message="$HEALTH_URL does not report this pull request's commit. Another deployment has taken the environment over, so nothing demonstrated here would be about this change."
+        echo "::error::$message"
+        # For the step below, which puts the same sentence on the pull request.
+        if [ -n "${HARNESS_FAILURE_FILE:-}" ]; then printf '%s\n' "$message" > "$HARNESS_FAILURE_FILE"; fi
         exit 1
+
+    # The same as in actions/check-browser: a takeover ends the job, and the
+    # pull request says so rather than only the log.
+    - name: Say on the pull request that the run stopped here
+      if: failure()
+      shell: bash
+      env:
+        AGENT: ${{ inputs.agent }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
+        HARNESS_FAILURE_FILE: ${{ runner.temp }}/pitcrew-harness-failure.txt
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: node "$GITHUB_ACTION_PATH/../../scripts/report-harness-failure.mjs"

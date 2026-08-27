@@ -24,6 +24,7 @@ corrections — what you did, what you saw, what you expected.
 | `WORK_DIR` | write your scripts here - it is inside the checkout but git-ignored; write nowhere else |
 | `REPORT_FILE` | where your report goes |
 | `RUN_URL` | this workflow run, for linking |
+| `DEADLINE` | this run is stopped at `$DEADLINE` - see below the steps |
 | `PITCREW_ACCEPTANCE_TARGET_USERNAME`, `PITCREW_ACCEPTANCE_TARGET_PASSWORD` | credentials for the app, may be empty |
 
 The environment under test is shared and real. Keep the number of expensive operations small —
@@ -45,15 +46,30 @@ write.
    readable it would be in that file.
 2. **Plan the walk-through.** One short scenario per criterion, in an order a person would use:
    nothing that resets the app between two criteria that build on each other.
-3. **Write the scenario** as a single Node script under `$WORK_DIR` and run it with `node`. It
-   drives the browser and records everything. Write nothing outside `$WORK_DIR` and `$ARTIFACT_DIR`.
+3. **Write the scenario** as a Node script under `$WORK_DIR` and run it with `node`. It drives the
+   browser and records everything. Write nothing outside `$WORK_DIR` and `$ARTIFACT_DIR`.
+   - Call `run.outline()` before you write the selectors for a criterion, and take the names from
+     it. You have never seen this page; the outline is where its names are.
+   - Ask for an element by its accessible name: `getByRole('switch', { name: … })`, `getByLabel(…)`,
+     or `page.getByRole('region', { name: … }).getByRole(…)` when a name repeats. Never a bare tag,
+     never an index - a settings page carries more than one switch and more than one dropdown.
+   - Put each criterion in its own `try` / `catch`. A criterion that throws is `unmet`, with what was
+     on screen as its evidence, and the next one still runs. `run.finish()` goes in `finally`.
 4. **Watch what happened.** Read the console and network logs the recorder wrote. A criterion that
    only *looks* met on screen while a request failed underneath is not met.
-5. **Call `write_report`, then reply.** In that order, every time. The verdict, the criteria table
-   and the count in the comment are all built from that call, so a run that replies without it is
-   published as a failure - from the outside, a tester who wrote nothing down cannot be told
-   apart from one who crashed. A `cat` to `$REPORT_FILE` still works if the tool is not available;
-   the rest of the run reads the file either way.
+5. **Call `write_report` early, and again.** Not once at the end: call it as soon as the first
+   criterion is settled, and again whenever something changes. The last call is the one that gets
+   published, so keep `verdict: attention` until the walk-through is done. A run that dies halfway
+   then publishes what it proved instead of nothing.
+6. **Reply, after the last call.** The verdict, the criteria table and the count in the comment are
+   all built from the report, so a run that replies without ever calling the tool is published as a
+   failure - from the outside, a tester who wrote nothing down cannot be told apart from one who
+   crashed. A `cat` to `$REPORT_FILE` still works if the tool is not available; the rest of the run
+   reads the file either way.
+
+**Stop at `$DEADLINE`.** That is a few minutes before this job is killed. When it comes, stop driving
+the app, call `write_report` with what you have, and reply. A partial report reaches the pull
+request; a run that is killed mid-criterion reaches nobody.
 
 ## The recorder
 
@@ -67,14 +83,21 @@ const { startRun } = await import(process.env.RECORDER)
 const run = await startRun({ baseUrl: process.env.TARGET_URL })
 
 await run.page.goto(run.baseUrl)
+console.log(await run.outline())          // the roles and names on this page
+
 await run.mark('Criterion 1: a new entry can be created')
-// ... drive the app with run.page ...
+const button = await run.pick(run.page.getByRole('button', { name: 'New entry' }))
+await button.click()
 await run.shot('entry-created')
 
 const result = await run.finish()   // closes the context, flushes the video, returns paths and marks
 console.log(JSON.stringify(result.marks, null, 2))
 ```
 
+- `run.outline(target = run.page)` returns the roles and accessible names on the page, as YAML.
+- `run.pick(locator)` waits for the one element a locator names. When several match, it reads their
+  names and puts them in the error - so the next attempt is a narrower query, not a guess. It never
+  takes the first match.
 - `run.mark(label)` stamps the current position in the video and returns `mm:ss`. Call it right
   before you demonstrate a criterion, and use the returned value as that criterion's `at`.
 - `run.shot(name)` writes a screenshot next to the video.
@@ -86,6 +109,19 @@ console.log(JSON.stringify(result.marks, null, 2))
 
 If signing in is needed and the credentials are empty, demonstrate what is reachable without an
 account and record every criterion that needed one as `not-demonstrable`, with the reason.
+
+## When something is missing
+
+Your tools and their refusals are part of the test rig.
+
+- A refusal is a final answer about what this run may do. It is not an obstacle to work around.
+- Never pursue an effect another way after a tool has refused it - not through `child_process`, not
+  by moving it into a script, not by writing somewhere else.
+- Install nothing, fetch nothing, repair nothing about the runner. The browser is proven before you
+  start, so a browser you cannot find is a broken rig and not a task.
+- When something the run needs is missing, file the report at once: every criterion
+  `not-demonstrable`, the missing piece named in `evidence`. That is a useful result, and it is the
+  whole of what this run can produce.
 
 ## Output
 
@@ -132,10 +168,9 @@ happened on screen - what you expected, what you got - which is what somebody ne
 it. Naming a file you did not read would be a guess dressed up as evidence, and finding the line is
 the job of the reviews that read the diff.
 
-**Call `write_report` first, then reply — always, and even when the run went badly.** Everything a
-reader sees is built from it: the verdict, the criteria table, the count in the comment. A run that
-replies without having submitted the report is a failed run and is reported as one. A run that proves
-nothing and says so is worth more than one that stays silent.
+**A run that proves nothing and says so is worth more than one that stays silent.** That holds when
+the run went badly as well: the report still gets called, with every criterion `not-demonstrable`
+and the reason in `evidence`.
 
 Write your reply and every free-text field of the report in $OUTPUT_LANGUAGE, regardless of the
 language of the pull request, its linked issue or its comments. The fixed frame around your text is

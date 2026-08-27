@@ -715,7 +715,8 @@ A draft blocks neither this nor `/acceptance`: both are an explicit ask. The two
 skip drafts.
 
 If the deployment is not serving this commit yet, `actions/check-deployment` fails the run before the
-agent starts. Request the reviewer again once it is up. A runner that waited half an hour for the
+agent starts, and says so on the pull request: the failure becomes a report with no criteria, and it
+goes through the frame every other run uses. Request the reviewer again once it is up. A runner that waited half an hour for the
 other checks would be the polling job this package already removed.
 
 ## Why the concurrency group carries a comment id
@@ -802,6 +803,28 @@ needs `unzip` added for the OpenCode installer, and a container job defaults to 
 runner's bash, so the workflow sets `shell: bash` or the first `set -o pipefail` ends a step with
 "Illegal option".
 
+**The browser is proven before the model is called.** The image brings the browsers; the recorder
+needs the driver, the `playwright-core` package that speaks to them. Those are two different things,
+and one run had the first without the second. Nothing checked, so the agent met the gap itself: half
+an hour of a job that held the model key went into fetching a package and looking for a way around
+its own permissions, and no verdict was written. `actions/check-browser` now resolves the driver -
+`PITCREW_PLAYWRIGHT_MODULE` first, then the known locations, `npm root -g` and a depth-limited
+search of named roots, never the workspace - and starts Chromium with it. A `stat` would not do: a package that resolves but cannot
+start the browser fails at the same point in the run as no package at all. The proven path is
+exported, so the recorder loads what the preflight loaded. Nothing is installed at run time; a
+driver fetched into this job would land next to the model key and the credentials of the environment
+under test. A failure ends the job in seconds, with one sentence in the log and on the pull request.
+
+**The agent knows when it has to stop.** `DEADLINE` is the job's timeout minus five minutes, and the
+prompt says to file the report and reply when it comes. The OpenCode call is wrapped in `timeout` at
+the same budget, because a step of a composite action cannot carry a `timeout-minutes` of its own -
+so a run that overruns still leaves its artifact, its report and its comment behind.
+
+**The report is a running record, not a last act.** The agent calls `write_report` as soon as the
+first criterion is settled and again whenever something changes; the last call is the one that gets
+published. Before that, a run that died in the middle published nothing at all, and a walk-through
+that proved two criteria was indistinguishable on the pull request from one that proved none.
+
 `scripts/recorder.mjs` opens a recording browser context and captures console output and failed
 requests. It knows nothing about any particular application - no sign-in, no seeding, no fixtures,
 no request mocking - because all of that would be knowledge about one project. Every click, selector
@@ -811,6 +834,16 @@ flushed because the context stayed open, a failed request nobody noticed because
 watched, and a recording nobody can navigate because nothing marks where each criterion begins.
 `run.mark(label)` stamps a position and returns `mm:ss`, which is what a criterion's `at` field
 carries.
+
+Two of its helpers are about finding a control rather than recording one, and they are here for the
+same reason: how to find a button is browser knowledge, and this is where the browser knowledge
+lives. `run.outline()` returns the page's roles and accessible names, so the agent takes its
+selectors from the page instead of guessing them. `run.pick(locator)` waits for the one element a
+locator names; when several match it reads their names and puts them in the error. It never takes
+the first match - demonstrating the wrong switch is worse than a criterion nobody could
+demonstrate. The prompt asks for accessible names rather than bare tags or indexes, and puts each
+criterion in its own `try` / `catch`, so one ambiguous locator costs a criterion and not the walk-
+through.
 
 Video, screenshots and logs are uploaded as the `acceptance-proof` artifact, and the summary comment
 links it.

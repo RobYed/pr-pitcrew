@@ -183,6 +183,17 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.pull_request.number || github.event.issue.number }}
 
+      # The image brings the browsers; the recorder needs the driver that speaks
+      # to them, and one run had the first without the second. Proven here, with
+      # a real launch, before a model is called: a failure costs seconds instead
+      # of half an hour of an agent improvising around a broken rig.
+      - uses: RobYed/pr-pitcrew/actions/check-browser@main
+        with:
+          playwright-image: ${{ inputs.playwright-image }}
+          playwright-module: ${{ vars.PITCREW_PLAYWRIGHT_MODULE }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number || github.event.issue.number }}
+
       - uses: RobYed/pr-pitcrew/actions/agent@main
         with:
           agent: acceptance-test
@@ -196,6 +207,9 @@ jobs:
           target-username: ${{ secrets.target-username }}
           target-password: ${{ secrets.target-password }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}
+          # The agent's deadline and the runtime's own timeout come from this: see
+          # actions/agent, "Hand the agent its inputs".
+          timeout-minutes: ${{ inputs.timeout-minutes }}
           artifact-name: acceptance-proof
           artifact-label: Video and screenshots
           # No severity gate here, and not for want of one: this agent reports

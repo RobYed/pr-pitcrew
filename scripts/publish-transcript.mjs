@@ -85,6 +85,27 @@ const TOOL_ICON = {
   write_report: '📋',
 };
 
+/**
+ * Whether a failed tool call was refused rather than broken.
+ *
+ * The difference is the one a reader needs first: a crash is something to fix,
+ * a refusal is the rig saying no - and a run that spends its budget arguing with
+ * a refusal looks, in an unmarked transcript, exactly like a run that hit bugs.
+ *
+ * Matched on the runtime's own wording, and deliberately narrow. A connection
+ * that was refused is a network failure, not a permission, and the two would be
+ * indistinguishable under a looser test. Anything this does not recognise keeps
+ * the plain failure marker, so a wrong guess costs nothing.
+ */
+export function isRefusal(text) {
+  const message = String(text ?? '');
+  if (!message.trim()) return false;
+  if (/connection refused|ECONNREFUSED/i.test(message)) return false;
+  return /\b(?:rejected|not allowed|not permitted|permission denied|denied by|requires permission|permission request)\b/i.test(
+    message,
+  );
+}
+
 /** GitHub rejects a step summary above 1 MiB; the rest is margin for the frame. */
 const SUMMARY_LIMIT = 700_000;
 
@@ -365,7 +386,7 @@ function fold(summary, body, language = '') {
 function transcript(session) {
   const messages = Array.isArray(session?.messages) ? session.messages : [];
   const blocks = [];
-  const stats = { calls: 0, cost: 0, input: 0, output: 0, agent: '', model: '', start: NaN, end: NaN };
+  const stats = { calls: 0, refusals: 0, cost: 0, input: 0, output: 0, agent: '', model: '', start: NaN, end: NaN };
 
   for (const message of messages) {
     const info = message?.info ?? {};
@@ -408,15 +429,19 @@ function transcript(session) {
         // behind. They are shown - "it was in the middle of this" is exactly the
         // thing somebody reads a transcript for - but marked.
         const failed = status === 'error';
+        const refused = failed && isRefusal(part.state?.error);
         stats.calls += 1;
+        if (refused) stats.refusals += 1;
 
-        const icon = TOOL_ICON[part.tool] ?? '▪️';
+        // A refusal keeps its own icon: the permissions answered, and that is a
+        // different event from the tool breaking.
+        const icon = refused ? '⛔' : (TOOL_ICON[part.tool] ?? '▪️');
         const what = subject(part);
         const duration = took(part.state);
         const head = [
           `${when}${icon} **${part.tool}**`,
           what && `\`${inline(clip(what, 160))}\``,
-          failed && '— failed',
+          refused ? '— refused' : failed && '— failed',
           status === 'pending' || status === 'running' ? '— unfinished' : '',
           duration && `· ${duration}`,
         ]
@@ -430,7 +455,7 @@ function transcript(session) {
         }
         // The error, unlike an output, is the point of the line it belongs to.
         if (failed && part.state?.error) {
-          details.push(fold('Error', clip(part.state.error, INPUT_LIMIT), 'text'));
+          details.push(fold(refused ? 'Refused' : 'Error', clip(part.state.error, INPUT_LIMIT), 'text'));
         }
 
         blocks.push([head, ...details].join('\n\n'));
@@ -458,6 +483,7 @@ function header(stats) {
     stats.agent && `Agent \`${stats.agent}\``,
     stats.model && `Model \`${stats.model}\``,
     `${stats.calls} tool call${stats.calls === 1 ? '' : 's'}`,
+    stats.refusals > 0 && `${stats.refusals} refused`,
     wall,
     stats.input + stats.output > 0 && `${tokens(stats.input)} in / ${tokens(stats.output)} out`,
     // Zero means the endpoint publishes no prices, not that the run was free.
@@ -467,49 +493,55 @@ function header(stats) {
   return `<sub>${facts.join(' · ')}</sub>`;
 }
 
-const session = loadSession();
-if (!session) giveUp('the session export could not be read.');
+// Everything above is a pure function of what the export said; this is the
+// script. Wrapped so `isRefusal` can be imported by a test without a run.
+function main() {
+  const session = loadSession();
+  if (!session) giveUp('the session export could not be read.');
 
-const { blocks, stats } = transcript(session);
-if (blocks.length === 0) giveUp('the session holds no steps to show.');
+  const { blocks, stats } = transcript(session);
+  if (blocks.length === 0) giveUp('the session holds no steps to show.');
 
-const lines = [`## ${title} — what the agent did`, '', header(stats), ''];
-let spent = lines.join('\n').length;
-let shown = 0;
+  const lines = [`## ${title} — what the agent did`, '', header(stats), ''];
+  let spent = lines.join('\n').length;
+  let shown = 0;
 
-for (const block of blocks) {
-  if (spent + block.length > SUMMARY_LIMIT) break;
-  lines.push(block, '');
-  spent += block.length + 2;
-  shown += 1;
+  for (const block of blocks) {
+    if (spent + block.length > SUMMARY_LIMIT) break;
+    lines.push(block, '');
+    spent += block.length + 2;
+    shown += 1;
+  }
+
+  if (shown < blocks.length) {
+    // Named rather than trimmed silently: a transcript that stops without saying
+    // so reads like a run that stopped there.
+    lines.push(
+      `<sub>${blocks.length - shown} further step${blocks.length - shown === 1 ? '' : 's'} did not fit into this page. The job log of the OpenCode step has them all.</sub>`,
+      '',
+    );
+  }
+
+  const markdown = redactor()(lines.join('\n'));
+
+  /**
+   * The run summary, but only for the run's own transcript.
+   *
+   * `SESSION_EXPORT` is the try-it-out mode, and it never writes to the summary
+   * even when Actions has set `GITHUB_STEP_SUMMARY` - it prints instead. That is
+   * not tidiness, it is the fix for a real accident: the acceptance agent tried
+   * this script inside its own job, with a made-up export, to prove that it
+   * renders what it claims. `GITHUB_STEP_SUMMARY` pointed at *its* step, which
+   * runs before the report - so the run's page read: a transcript of three
+   * invented tool calls, then the report, then the real transcript. The summary
+   * belongs above the history, and a rehearsal belongs in the log.
+   */
+  if (process.env.GITHUB_STEP_SUMMARY && !exportFile) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
+    console.log(`Wrote ${shown} of ${blocks.length} steps into the run summary.`);
+  } else {
+    console.log(markdown);
+  }
 }
 
-if (shown < blocks.length) {
-  // Named rather than trimmed silently: a transcript that stops without saying
-  // so reads like a run that stopped there.
-  lines.push(
-    `<sub>${blocks.length - shown} further step${blocks.length - shown === 1 ? '' : 's'} did not fit into this page. The job log of the OpenCode step has them all.</sub>`,
-    '',
-  );
-}
-
-const markdown = redactor()(lines.join('\n'));
-
-/**
- * The run summary, but only for the run's own transcript.
- *
- * `SESSION_EXPORT` is the try-it-out mode, and it never writes to the summary
- * even when Actions has set `GITHUB_STEP_SUMMARY` - it prints instead. That is
- * not tidiness, it is the fix for a real accident: the acceptance agent tried
- * this script inside its own job, with a made-up export, to prove that it
- * renders what it claims. `GITHUB_STEP_SUMMARY` pointed at *its* step, which
- * runs before the report - so the run's page read: a transcript of three
- * invented tool calls, then the report, then the real transcript. The summary
- * belongs above the history, and a rehearsal belongs in the log.
- */
-if (process.env.GITHUB_STEP_SUMMARY && !exportFile) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
-  console.log(`Wrote ${shown} of ${blocks.length} steps into the run summary.`);
-} else {
-  console.log(markdown);
-}
+if (import.meta.url === `file://${process.argv[1]}`) main();

@@ -107,3 +107,6 @@ jobs:
           fail-on-no-report: ${{ vars.PITCREW_FAIL_ON_NO_REPORT }}
           require-full-coverage: ${{ vars.PITCREW_REQUIRE_FULL_COVERAGE }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}
+          # The agent's deadline and the runtime's own timeout come from this: see
+          # actions/agent, "Hand the agent its inputs".
+          timeout-minutes: ${{ inputs.timeout-minutes }}

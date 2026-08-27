@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The acceptance test proves the browser before it spends anything.** The Playwright image brings
+  the browsers; the recorder needs the driver that speaks to them, and one run had the first without
+  the second. Nothing checked, so the agent met the gap itself: half an hour of a job holding the
+  model key went into fetching a package and looking for a way around its own permissions, and no
+  verdict was ever written. `actions/check-browser` now resolves the driver and starts Chromium with
+  it before the model is called. A missing driver ends the job in seconds, with one sentence naming
+  the image and the two ways out. Nothing is installed at run time. `PITCREW_PLAYWRIGHT_MODULE`
+  points at the package in an image of your own.
+- **A run that stops early publishes the criteria it proved.** The report used to be the last act, so
+  a walk-through that settled two criteria and then threw published nothing - and looked, on the
+  pull request, like a run that proved nothing at all. The agent now files the report as soon as the
+  first criterion is settled and again whenever it changes. It is also told when the job ends
+  (`DEADLINE`), and the runtime is stopped a few minutes earlier, so the artifact, the report and
+  the comment still get their turn.
+- **One ambiguous selector no longer ends the walk-through.** The agent wrote its scenario against a
+  page it had never seen: `button[role="switch"]` on a settings page with two switches. Playwright's
+  strict mode turned the first click into an exception and the run stopped there. The recorder now
+  offers `run.outline()`, the roles and accessible names on the page, and `run.pick()`, which names
+  the candidates when a locator matches several instead of taking the first. The prompt asks for
+  accessible names rather than bare tags or indexes, and puts each criterion in its own `try` /
+  `catch`.
+- **A precondition that fails says so on the pull request.** A browser that could not be proven and a
+  deployment serving somebody else's commit both end the job in seconds. The reason now reaches the
+  pull request as a report with no criteria, through the frame every other run uses, instead of only
+  the job log.
 - **A review that never opened the files it reported on can no longer look like a thorough pass.**
   The hunk is three lines of context; the questions a security review asks are questions about the
   file. `fetch-diff.mjs` now writes the paths from that same diff, the prompt names them, and the
@@ -35,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The acceptance prompt says what to do when the rig is broken.** A refusal is a final answer;
+  nothing is installed, fetched or repaired; a missing piece is filed as a report with every
+  criterion `not-demonstrable`. The recorder's own error message says the same, in place of the
+  operator advice a model with a shell used to read as a to-do list. The transcript marks a refused
+  tool call apart from one that crashed and counts them. The two review agents are untouched.
 - On a `pull_request`: the pull request's title, body and comments no longer
   reach the model, and no comment appears on the pull request until the review
   is published. Comment-triggered runs are unchanged.

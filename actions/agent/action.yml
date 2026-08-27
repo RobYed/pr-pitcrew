@@ -130,6 +130,14 @@ inputs:
       default.
     required: false
     default: 'English'
+  timeout-minutes:
+    description: >-
+      The job's own `timeout-minutes`. With it the agent is given a deadline and
+      the runtime is stopped a few minutes before the job dies, so the report,
+      the artifact and the comment still get their turn. Without it neither
+      happens and a run that overruns is killed mid-sentence.
+    required: false
+    default: ''
   opencode-version:
     description: >-
       Version of the OpenCode runtime to install. Pinned on purpose; see
@@ -278,6 +286,7 @@ runs:
         TARGET_USERNAME: ${{ inputs.target-username }}
         TARGET_PASSWORD: ${{ inputs.target-password }}
         WANTS_TARGET: ${{ steps.manifest.outputs.wants-target }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
       run: |
         set -euo pipefail
 
@@ -298,6 +307,29 @@ runs:
           # a bare `import` would not find it; recorder.mjs resolves this path.
           echo "PLAYWRIGHT_MODULE=${PLAYWRIGHT_MODULE:-/ms-playwright-agent/node_modules/playwright-core}"
         } >> "$GITHUB_ENV"
+
+        # A model has no clock. Without one it plans a walk-through as if the
+        # budget were endless, and the job's timeout arrives in the middle of a
+        # criterion - with nothing filed, because the report was the last step.
+        #
+        # Five minutes short of the job, and measured from here rather than from
+        # the job's start: this step runs a minute or two in, and the margin
+        # covers that as well as the publishing steps at the end.
+        # A `case`, not a numeric test: `[ abc -gt 0 ]` is an error, and under
+        # `set -e` an unset or misspelled input would end the step here rather
+        # than simply leave the deadline out.
+        case "${TIMEOUT_MINUTES:-}" in
+          '' | *[!0-9]*) ;;
+          *)
+            budget=$(( TIMEOUT_MINUTES - 5 ))
+            if [ "$budget" -lt 1 ]; then budget=1; fi
+            {
+              echo "DEADLINE=$(date -u -d "+$budget minutes" '+%Y-%m-%dT%H:%M:%SZ')"
+              echo "PITCREW_AGENT_TIMEOUT=$(( budget * 60 ))"
+            } >> "$GITHUB_ENV"
+            echo "The agent has $budget minutes; the runtime is stopped after that."
+            ;;
+        esac
 
         # Kept out of the block above so a stray newline in a secret cannot
         # forge a variable assignment.
@@ -410,7 +442,27 @@ runs:
         # The prompt goes in on stdin, verbatim. As an argument it would be
         # re-quoted by the CLI; see "Build the configuration and the prompt".
         echo "opencode run --agent $AGENT --model $MODEL  # prompt: $PROMPT_FILE"
-        "$HOME/.opencode/bin/opencode" run --agent "$AGENT" --model "$MODEL" < "$PROMPT_FILE"
+
+        # `timeout`, and not the step's own `timeout-minutes`, because a step of
+        # a composite action cannot carry one. A run killed by the *job's*
+        # timeout takes the recovery, the artifact and the comment with it; this
+        # ends the runtime a few minutes earlier and leaves them their turn.
+        status=0
+        if [ -n "${PITCREW_AGENT_TIMEOUT:-}" ]; then
+          timeout --signal=INT --kill-after=30s "$PITCREW_AGENT_TIMEOUT" \
+            "$HOME/.opencode/bin/opencode" run --agent "$AGENT" --model "$MODEL" < "$PROMPT_FILE" || status=$?
+        else
+          "$HOME/.opencode/bin/opencode" run --agent "$AGENT" --model "$MODEL" < "$PROMPT_FILE" || status=$?
+        fi
+
+        # 124 is the timeout, and it is the case this exists for: whatever the
+        # agent has written down by now is recovered and published by the steps
+        # below. Every other failure still ends the step.
+        if [ "$status" -eq 124 ]; then
+          echo '::warning::The agent ran out of its time budget and was stopped, so the steps below publish what it had.'
+          exit 0
+        fi
+        exit "$status"
 
     - name: Run the agent through the OpenCode action
       if: github.event_name != 'pull_request'

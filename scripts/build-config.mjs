@@ -64,6 +64,7 @@ export const PLACEHOLDERS = [
   'RECORDER',
   'TARGET_URL',
   'OUTPUT_LANGUAGE',
+  'DEADLINE',
 ];
 
 class ConfigError extends Error {}

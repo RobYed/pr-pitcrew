@@ -34,6 +34,7 @@ Settings → Secrets and variables → Actions → Variables.
 | `PITCREW_ACCEPTANCE_TARGET_URL` | acceptance test | yes for that agent | none | The deployed application the agent drives. Without it the run stops with an error rather than pretending to test something. |
 | `PITCREW_ACCEPTANCE_TARGET_HEALTH_URL` | acceptance test | no | none | An endpoint whose response names the deployed commit. When set, the run refuses to demonstrate somebody else's deployment. Matched against both the head commit and the test merge commit, because a preview built by a `pull_request` workflow reports the latter. Unset means unverified, not refused. |
 | `PITCREW_ACCEPTANCE_REVIEWER` | acceptance test | yes for the review-request trigger | none | GitHub login, or a team name or slug, whose review request starts a run. Without it only `/acceptance` on a comment starts one. Do not put this account in `CODEOWNERS`. |
+| `PITCREW_PLAYWRIGHT_MODULE` | acceptance test | no | none | Path to the Playwright package, for an image that puts it somewhere of its own. The preflight uses it and searches nowhere else, so a wrong path fails the run rather than hiding behind a different driver. |
 | `PITCREW_ACCEPTANCE_ALLOW_PUBLIC` | acceptance test | no | unset | `true` lets the acceptance test run in a **public** repository. Off by default, and for a reason: see [threat-model.md](threat-model.md). |
 
 ## Secrets
