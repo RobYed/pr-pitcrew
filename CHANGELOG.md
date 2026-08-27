@@ -9,72 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A pull request opened or pushed by a GitHub App bot is reviewed again. Every
-  run went through `opencode github run`, which refuses to start unless the
-  triggering actor has write access - and GitHub's collaborator API answers
-  `none` for every bot account, because a bot is not a collaborator. Pull
-  requests from `cursor[bot]`, `github-actions[bot]` and their kind therefore
-  ended with `permission: none` and a red check before the model saw the diff.
-  A `pull_request` now runs through the OpenCode CLI, where that lookup does not
-  happen; the comment triggers keep the action, which is the right door for
-  them. What authorises a `pull_request` is unchanged: a fork gets no secrets
-  from GitHub and is refused by `assert-same-repo.mjs`, so the head branch lives
-  in the repository and somebody with write access pushed it. See
-  [ADR 9](docs/adr/0009-the-pull-request-path-runs-the-cli.md), and
-  `docs/threat-model.md` for the one thing this gives up and how to add it back.
-- A run whose agent step died before OpenCode had a session no longer publishes
-  an invented `verdict: pass`. `ensure-report.mjs` asked for the report with
-  `opencode run --continue`; with nothing to continue, that opens a *new*
-  session whose only instruction is to call `write_report`, and a model with no
-  diff in front of it answers "no defects found". The pull request then carried
-  a passed quality gate for a review that never ran. The recovery turn now needs
-  a session id from `session list` before it spends anything, and a run without
-  one is published as what it is: a run that reviewed nothing.
+- **A pull request opened or pushed by a bot is reviewed again.** `cursor[bot]`,
+  `github-actions[bot]` and their kind used to end with `permission: none` and a
+  red check before the model saw the diff. A `pull_request` now runs through the
+  OpenCode CLI, which does not ask who the actor is; the comment triggers keep
+  the action. Nothing else about who may start a run changed - forks are still
+  refused. [ADR 9](docs/adr/0009-the-pull-request-path-runs-the-cli.md) has the
+  reasoning, `docs/threat-model.md` the one thing it gives up.
+- **A run that reviewed nothing is no longer published as `verdict: pass`.**
+  When the agent died before OpenCode had a session, the recovery turn invented
+  an empty "no defects found" review. It now needs a session before it spends
+  anything, and such a run is published as what it was.
 
 ### Changed
 
-- On a `pull_request`, the pull request's title, body and comments no longer
-  reach the prompt: the wrapper action assembled those, and nothing on that path
-  does now. The agent gets what this package fetched - the diff, and for the
-  acceptance test the linked issue. A comment-triggered run is unchanged.
-- On a `pull_request`, no comment appears on the pull request until the review
-  is published. The action posted a `[Working...]` placeholder and then the
-  agent's raw reply, which `publish-report.mjs` rewrote; now it posts its own
-  comment, which it already knew how to do.
-- The agent that runs is named on the command line (`--agent`) as well as
-  through `default_agent`, so agent selection no longer rests on one field the
-  runtime is free to ignore.
+- On a `pull_request`: the pull request's title, body and comments no longer
+  reach the model, and no comment appears on the pull request until the review
+  is published. Comment-triggered runs are unchanged.
+- The acceptance test no longer starts itself for a pull request whose author is
+  not an `OWNER`, `MEMBER` or `COLLABORATOR`. Its two ordinary triggers - a
+  review request and `/acceptance` - are unaffected.
+- With a GitHub App, **Administration: read** is now only needed if you use the
+  comment triggers.
 
 ### Security
 
-- The branch under review configures the runtime on neither path.
-  `OPENCODE_DISABLE_PROJECT_CONFIG` is set on every step that starts the
-  runtime - the review itself, the recovery turn and the transcript read, since
-  on the `pull_request` path the workspace is that branch - so an `opencode.json`,
-  an `AGENTS.md` as system instructions or a custom tool under `.opencode/` from
-  the head branch is not loaded - that last one being JavaScript imported into
-  the process holding the model key, for an agent that otherwise has no shell.
-  The agents still *read* your `AGENTS.md`: their prompts send them to it, and
-  now the transcript shows it happening. The report tool this package installs
-  in `~/.config/opencode/tools/` is unaffected.
-- On a `pull_request`, the repository token is no longer in the environment of
-  the process that reads the diff. The CLI talks to no GitHub API; everything on
-  the pull request is published by the steps after it.
-- Session sharing is refused in the generated configuration
-  (`"share": "disabled"`) rather than only through an action input the CLI does
-  not have.
-- The acceptance test states its own trust rule instead of inheriting one. Two
-  of its three triggers are a gesture by somebody the repository already trusts
-  - requesting a reviewer needs write or triage access, and the `/acceptance`
-  comment reads the commenter's association. The third, an ordinary
-  `pull_request` as an orchestrator calls it, was caught downstream by the
-  runtime's actor check, and on that path a run no longer goes through it. Since
-  this is the agent with a shell, the model key and the credentials of the
-  environment under test, that branch of the workflow's `if:` now requires the
-  pull request's `author_association` to be `OWNER`, `MEMBER` or `COLLABORATOR`.
-  `docs/threat-model.md` says what that is worth: it keeps an outsider's pull
-  request from starting the agent unattended, and it does not tell a read-only
-  collaborator from a writer.
+- **Your branch no longer configures the runtime that reviews it**: no
+  `opencode.json`, no `AGENTS.md` as system instructions, no tool under
+  `.opencode/` - that last one was JavaScript in the process holding your model
+  key. The agents still read your `AGENTS.md`; their prompts send them to it.
+- The repository token is no longer in the process that reads the diff, and
+  session sharing is refused in the configuration rather than only by an input
+  the CLI does not have.
 
 ## [1.0.0] - 2026-08-24
 
