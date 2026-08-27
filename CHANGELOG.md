@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-27
+
+### Added
+
+- `PITCREW_REQUIRE_FULL_COVERAGE`. A measured shortfall that survives the extra turn fails the
+  check. `false` keeps the number on the comment and the check green. An unreadable session export
+  is a warning and no number, never a silent `N of N`.
+- `PITCREW_PLAYWRIGHT_MODULE`. The path to the Playwright package, for an image that keeps it
+  somewhere of its own. The preflight uses that path and searches nowhere else, so a wrong one fails
+  the run instead of hiding behind a different driver.
+
+### Changed
+
+- **The acceptance prompt says what to do when the rig is broken.** A refusal is a final answer;
+  nothing is installed, fetched or repaired; a missing piece is filed as a report with every
+  criterion `not-demonstrable`. The recorder's own error message says the same, in place of the
+  operator advice a model with a shell used to read as a to-do list. The transcript marks a refused
+  tool call apart from one that crashed and counts them. The two review agents are untouched.
+- On a `pull_request`: the pull request's title, body and comments no longer
+  reach the model, and no comment appears on the pull request until the review
+  is published. Comment-triggered runs are unchanged.
+- The acceptance test no longer starts itself for a pull request whose author is
+  not an `OWNER`, `MEMBER` or `COLLABORATOR`. Its two ordinary triggers - a
+  review request and `/acceptance` - are unaffected.
+- With a GitHub App, **Administration: read** is now only needed if you use the
+  comment triggers.
+
 ### Fixed
 
 - **The acceptance test proves the browser before it spends anything.** The Playwright image brings
@@ -52,28 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an empty "no defects found" review. It now needs a session before it spends
   anything, and such a run is published as what it was.
 
-### Added
-
-- `PITCREW_REQUIRE_FULL_COVERAGE`. A measured shortfall that survives the extra turn fails the
-  check. `false` keeps the number on the comment and the check green. An unreadable session export
-  is a warning and no number, never a silent `N of N`.
-
-### Changed
-
-- **The acceptance prompt says what to do when the rig is broken.** A refusal is a final answer;
-  nothing is installed, fetched or repaired; a missing piece is filed as a report with every
-  criterion `not-demonstrable`. The recorder's own error message says the same, in place of the
-  operator advice a model with a shell used to read as a to-do list. The transcript marks a refused
-  tool call apart from one that crashed and counts them. The two review agents are untouched.
-- On a `pull_request`: the pull request's title, body and comments no longer
-  reach the model, and no comment appears on the pull request until the review
-  is published. Comment-triggered runs are unchanged.
-- The acceptance test no longer starts itself for a pull request whose author is
-  not an `OWNER`, `MEMBER` or `COLLABORATOR`. Its two ordinary triggers - a
-  review request and `/acceptance` - are unaffected.
-- With a GitHub App, **Administration: read** is now only needed if you use the
-  comment triggers.
-
 ### Security
 
 - **Your branch no longer configures the runtime that reviews it**: no
@@ -83,6 +88,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The repository token is no longer in the process that reads the diff, and
   session sharing is refused in the configuration rather than only by an input
   the CLI does not have.
+- **The browser preflight no longer looks in the workspace for a driver.**
+  `actions/check-browser` calls `require()` on the package it finds, and
+  `$GITHUB_WORKSPACE/node_modules/playwright-core` was one of the places it looked - the reviewed
+  branch's own code, loaded as root before the fork refusal in `actions/agent` has run. That
+  candidate is gone. The remaining ones resolve from this package's checkout and from named roots,
+  never down into the workspace, and an image that keeps its driver elsewhere is served by
+  `PITCREW_PLAYWRIGHT_MODULE`, which a maintainer sets and a pull request cannot.
+- **A run is assumed not to share a runner, and the threat model now says so.** Report recovery
+  reads OpenCode's newest session, and "newest" means newest in the runner's home directory. On a
+  GitHub-hosted runner that is this run's own session and the shortcut is exact. On a self-hosted
+  runner that is not ephemeral it can be another repository's, whose findings would then be
+  published on your pull request. `docs/threat-model.md` carries the limitation and the mitigation -
+  give Pitcrew an ephemeral runner, or one no other repository uses. The code is unchanged; the
+  behaviour is tracked as issue #11.
 
 ## [1.0.0] - 2026-08-24
 
@@ -141,5 +160,6 @@ Version `1.0.0` rather than `0.1.0`: the interface is the one that has been
 running in a private repository for weeks, and `@v1` is what the examples and
 the documentation reference.
 
-[Unreleased]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/RobYed/pr-pitcrew/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/RobYed/pr-pitcrew/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/RobYed/pr-pitcrew/releases/tag/v1.0.0
