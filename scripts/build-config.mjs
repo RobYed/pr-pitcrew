@@ -55,6 +55,7 @@ const PROVIDER = 'llm';
 export const PLACEHOLDERS = [
   'DIFF_FILE',
   'DIFF_SCOPE',
+  'CHANGED_FILES',
   'ISSUE_FILE',
   'REPORT_FILE',
   'RUN_URL',

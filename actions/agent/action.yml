@@ -90,6 +90,13 @@ inputs:
       found anything in.
     required: false
     default: ''
+  require-full-coverage:
+    description: >-
+      `true` fails the check when the agent did not open every changed file
+      this run asked it to. Default: the shortfall is named on the comment
+      and the check stays green.
+    required: false
+    default: ''
   target-url:
     description: The deployed application an agent with a browser should drive.
     required: false
@@ -240,6 +247,7 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         PR_NUMBER: ${{ inputs.pr-number || github.event.pull_request.number || github.event.issue.number }}
         DIFF_FILE: ${{ github.workspace }}/.pitcrew-run/pr.diff
+        CHANGED_FILES: ${{ github.workspace }}/.pitcrew-run/changed-files.txt
         # Empty on everything but a push, which is what makes the whole pull
         # request the subject when a human asks for a review by comment.
         BEFORE_SHA: ${{ github.event.before }}
@@ -469,6 +477,28 @@ runs:
         OPENCODE_DISABLE_PROJECT_CONFIG: '1'
       run: node "$PITCREW_HOME/scripts/ensure-report.mjs"
 
+    # The prompt asks the agent to open every changed file. Curiosity is not a
+    # floor, so this step measures what it actually read against the list
+    # fetch-diff.mjs wrote. A shortfall gets one extra turn on the same
+    # session — open the missing files, write the report again — and the
+    # number goes on the comment either way. Nothing here fails the job:
+    # publish-report.mjs does that, after the findings are on the pull
+    # request, and only when the repository set PITCREW_REQUIRE_FULL_COVERAGE.
+    - name: Open the files the agent skipped
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        CHANGED_FILES: ${{ github.workspace }}/.pitcrew-run/changed-files.txt
+        COVERAGE_FILE: ${{ github.workspace }}/.pitcrew-run/coverage.json
+        MODEL: ${{ steps.config.outputs.model }}
+        PITCREW_LLM_API_KEY: ${{ inputs.api-key }}
+        PITCREW_LLM_API_BASE_URL: ${{ inputs.api-base-url }}
+        OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+        # Same door as the recovery turn: this step starts the runtime in the
+        # workspace, which on `pull_request` is the branch under review.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
+      run: node "$PITCREW_HOME/scripts/ensure-coverage.mjs"
+
     # Always: a run that went wrong is exactly when the video and the logs are
     # worth having.
     - name: Upload the proof
@@ -499,6 +529,8 @@ runs:
         ARTIFACT_LABEL: ${{ inputs.artifact-label || inputs.artifact-name }}
         PITCREW_FAIL_ON: ${{ inputs.fail-on }}
         PITCREW_FAIL_ON_NO_REPORT: ${{ inputs.fail-on-no-report }}
+        PITCREW_REQUIRE_FULL_COVERAGE: ${{ inputs.require-full-coverage }}
+        COVERAGE_FILE: ${{ github.workspace }}/.pitcrew-run/coverage.json
       run: node "$PITCREW_HOME/scripts/publish-report.mjs"
 
     # The transcript of the run, below the report in the run summary: one line

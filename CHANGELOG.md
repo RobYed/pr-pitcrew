@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A review that never opened the files it reported on can no longer look like a thorough pass.**
+  The hunk is three lines of context; the questions a security review asks are questions about the
+  file. `fetch-diff.mjs` now writes the paths from that same diff, the prompt names them, and the
+  comment's scope line says how many were actually opened — `7 of 29 changed files opened` — so a
+  shallow run and a thorough one no longer look identical on the pull request. A shortfall gets one
+  extra turn to open the missing files. Markdown, lockfiles and deletions are not on the list.
 - **A pull request opened or pushed by a bot is reviewed again.** `cursor[bot]`,
   `github-actions[bot]` and their kind used to end with `permission: none` and a
   red check before the model saw the diff. A `pull_request` now runs through the
@@ -20,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   When the agent died before OpenCode had a session, the recovery turn invented
   an empty "no defects found" review. It now needs a session before it spends
   anything, and such a run is published as what it was.
+
+### Added
+
+- `PITCREW_REQUIRE_FULL_COVERAGE`. When `true`, a measured shortfall that survives the extra turn
+  fails the check. Default is off: the unread files are still named. An unreadable session export
+  is a warning and no number, never a silent `N of N`.
 
 ### Changed
 

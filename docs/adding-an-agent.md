@@ -101,6 +101,7 @@ because an agent without a shell cannot resolve an environment variable.
 ```markdown
 - The diff you are reviewing is the file `$DIFF_FILE`. Read it first.
 - What it covers: $DIFF_SCOPE
+- The files you have to open are listed in `$CHANGED_FILES`, one path per line.
 - The repository is checked out around you at the pull request's head commit. Read `LICENSE`, the
   dependency manifests and whatever else the diff makes you curious about.
 ```
@@ -211,6 +212,7 @@ jobs:
           model: ${{ inputs.model || vars.PITCREW_LLM_API_MODEL_LEGAL_REVIEW || vars.PITCREW_LLM_API_MODEL }}
           fail-on: ${{ inputs.fail-on || vars.PITCREW_FAIL_ON }}
           fail-on-no-report: ${{ vars.PITCREW_FAIL_ON_NO_REPORT }}
+          require-full-coverage: ${{ vars.PITCREW_REQUIRE_FULL_COVERAGE }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}
 ```
 

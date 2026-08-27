@@ -52,6 +52,18 @@ describe('the agents this package ships', () => {
         assert.deepEqual(unknown, [], `prompt names placeholders nothing fills: ${unknown.join(', ')}`);
       });
 
+      it('asks a diff review to open the files the harness listed', () => {
+        // The other direction of the placeholder check: a harness that fills
+        // `$CHANGED_FILES` while the prompt no longer names it is a floor
+        // nobody is standing on. The acceptance agent does not review a diff.
+        const { manifest, promptText } = readAgent(root, id);
+        if (!manifest.inputs?.includes('diff')) return;
+        assert.ok(
+          promptText.includes('$CHANGED_FILES') || promptText.includes('${CHANGED_FILES}'),
+          'the prompt never names $CHANGED_FILES, so the list of files to open never reaches the agent',
+        );
+      });
+
       it('asks the agent to submit its report through the tool', () => {
         const { promptText } = readAgent(root, id);
         assert.ok(promptText.includes('write_report'), 'the prompt never names write_report');
@@ -186,7 +198,7 @@ describe('the agent action', () => {
     // session back is still a runtime booting in the workspace - which on the
     // `pull_request` path *is* the branch under review. Closing the door in one
     // step and leaving it open in the next is not closing it.
-    const starters = ['opencode run', 'uses: anomalyco/opencode/github', 'ensure-report.mjs', 'publish-transcript.mjs'];
+    const starters = ['opencode run', 'uses: anomalyco/opencode/github', 'ensure-report.mjs', 'ensure-coverage.mjs', 'publish-transcript.mjs'];
     for (const marker of starters) {
       const step = steps.find(candidate => candidate.includes(marker));
       assert.ok(step, `no step invokes ${marker}`);
