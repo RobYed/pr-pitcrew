@@ -63,12 +63,14 @@ production:
   fetched. Less untrusted text reaching the model is not a loss, but it is a change in what the agent
   knows - and on the comment path that context is still assembled.
 - **The runtime reads configuration from the working directory.** `OPENCODE_DISABLE_PROJECT_CONFIG`
-  is now set on **both** paths, so the branch under review contributes no `opencode.json`, no
-  `AGENTS.md` as system instructions, and - the reason this was worth nailing down - no
-  `.opencode/tool/*.js`, which OpenCode imports into its own process: JavaScript in the process
-  holding the model key, for an agent that otherwise has no shell. The report tool this package
-  installs lives in `~/.config/opencode/tools/` and is unaffected. An agent may still *read* an
-  `AGENTS.md` in the checkout; it is no longer handed to it as instructions.
+  is now set on **every step that starts the runtime** - both run paths, the recovery turn and the
+  transcript read - so the branch under review contributes no `opencode.json`, no `AGENTS.md` as
+  system instructions, and - the reason this was worth nailing down - no `.opencode/tool/*.js`, which
+  OpenCode imports into its own process: JavaScript in the process holding the model key, for an
+  agent that otherwise has no shell. Every step matters because on this path the workspace *is* the
+  branch under review, and the recovery turn spends a model call of its own there. The report tool
+  this package installs lives in `~/.config/opencode/tools/` and is unaffected. An agent may still
+  *read* an `AGENTS.md` in the checkout; it is no longer handed to it as instructions.
 - **`share: 'false'`.** The CLI has no such input, so the refusal moved into the generated
   configuration as `"share": "disabled"`, where both paths read it. A transcript of somebody's diff
   has no business at opencode.ai.

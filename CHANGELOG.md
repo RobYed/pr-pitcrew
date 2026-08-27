@@ -48,7 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - The branch under review configures the runtime on neither path.
-  `OPENCODE_DISABLE_PROJECT_CONFIG` is set on every run, so an `opencode.json`,
+  `OPENCODE_DISABLE_PROJECT_CONFIG` is set on every step that starts the
+  runtime - the review itself, the recovery turn and the transcript read, since
+  on the `pull_request` path the workspace is that branch - so an `opencode.json`,
   an `AGENTS.md` as system instructions or a custom tool under `.opencode/` from
   the head branch is not loaded - that last one being JavaScript imported into
   the process holding the model key, for an agent that otherwise has no shell.

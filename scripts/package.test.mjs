@@ -176,12 +176,21 @@ describe('the agent action', () => {
     assert.equal(cli.includes('GITHUB_TOKEN'), false, 'the CLI step carries a token it does not need');
   });
 
-  it('lets the branch under review configure the runtime on neither path', () => {
+  it('lets the branch under review configure the runtime in no step that starts it', () => {
     // Without this, `opencode.json`, `AGENTS.md` and `.opencode/tool/*.js` come
     // from the head branch - and that last one is JavaScript in the process
     // holding the model key, for an agent that otherwise has no shell.
-    for (const [name, step] of [['CLI', cli], ['action', wrapper]]) {
-      assert.match(step, /OPENCODE_DISABLE_PROJECT_CONFIG: '1'/, `the ${name} step lets the branch configure the runtime`);
+    //
+    // Every step that starts the runtime, not only the one that runs the
+    // review: the recovery turn spends a model call of its own, and reading a
+    // session back is still a runtime booting in the workspace - which on the
+    // `pull_request` path *is* the branch under review. Closing the door in one
+    // step and leaving it open in the next is not closing it.
+    const starters = ['opencode run', 'uses: anomalyco/opencode/github', 'ensure-report.mjs', 'publish-transcript.mjs'];
+    for (const marker of starters) {
+      const step = steps.find(candidate => candidate.includes(marker));
+      assert.ok(step, `no step invokes ${marker}`);
+      assert.match(step, /OPENCODE_DISABLE_PROJECT_CONFIG: '1'/, `the step running ${marker} lets the branch configure the runtime`);
     }
   });
 

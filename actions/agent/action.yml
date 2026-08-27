@@ -461,6 +461,12 @@ runs:
         PITCREW_LLM_API_KEY: ${{ inputs.api-key }}
         PITCREW_LLM_API_BASE_URL: ${{ inputs.api-base-url }}
         OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+        # This step spends a model turn of its own, in the workspace - which on
+        # the `pull_request` path is the branch under review. Every step that
+        # starts the runtime sets this, or the door the run step closed stands
+        # open in the one place a run reaches only when something has already
+        # gone wrong.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
       run: node "$PITCREW_HOME/scripts/ensure-report.mjs"
 
     # Always: a run that went wrong is exactly when the video and the logs are
@@ -510,4 +516,9 @@ runs:
         # own; a test account's address is neither, and is a secret all the
         # same. A step summary is not masked the way the log is.
         TRANSCRIPT_REDACT: PITCREW_ACCEPTANCE_TARGET_USERNAME
+        # `session list` and `export` read rather than think, but they start the
+        # runtime in the workspace all the same, and loading a project's
+        # configuration is where a branch's plugins get installed. Same rule as
+        # the two steps above: whoever starts the runtime sets this.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
       run: node "$PITCREW_HOME/scripts/publish-transcript.mjs"

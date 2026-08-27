@@ -146,7 +146,8 @@ in a footnote.
 
 ## The branch under review configures nothing
 
-`OPENCODE_DISABLE_PROJECT_CONFIG` is set on every run, on both paths. Without it the runtime reads
+`OPENCODE_DISABLE_PROJECT_CONFIG` is set on every step that starts the runtime: both run paths, the
+recovery turn that asks a session for its report, and the transcript read. Without it the runtime reads
 `opencode.json` from the working directory, takes `AGENTS.md` or `CLAUDE.md` as system instructions,
 and imports `.opencode/tool/*.js` - **JavaScript, into its own process**, the one holding the model
 key, for an agent that otherwise has no shell. All three would come from the branch under review.
