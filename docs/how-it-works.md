@@ -438,9 +438,9 @@ and a thorough one looked identical on the pull request.
 An unreadable export is a `::warning::` and no number, never a silent `N of N`. Inventing full
 coverage from a transcript we could not read would put the hole back.
 
-`PITCREW_REQUIRE_FULL_COVERAGE=true` is what fails a shortfall that survives the extra turn. Default
-is off: the comment still names the unread files, and a repository that wants the check red has to
-ask. Publishing still comes first.
+`PITCREW_REQUIRE_FULL_COVERAGE=false` is what keeps a shortfall that survives the extra turn green.
+Default is on: a pass built only on hunks is not evidence that the files were reviewed. The comment
+still names the unread files either way. Publishing still comes first.
 
 ## The summary comment and its fixed frame
 
@@ -666,7 +666,7 @@ history costs strictness, refusing to publish would cost the report.
 | | |
 | --- | --- |
 | 0 | the gate holds |
-| 1 | findings at or above the threshold, or a coverage shortfall the repository asked to fail |
+| 1 | findings at or above the threshold, or a coverage shortfall (unless `PITCREW_REQUIRE_FULL_COVERAGE=false`) |
 | 2 | no usable report: nothing was reviewed |
 | 3 | there was a report and it could not be published |
 
@@ -678,8 +678,8 @@ quietly on anybody's behalf. The verdict and the table are on the pull request; 
 `PITCREW_FAIL_ON_NO_REPORT=false` keeps a run whose agent produced nothing green, for a repository
 that would rather have the check than the review.
 
-`PITCREW_REQUIRE_FULL_COVERAGE=true` fails a run that did not open every changed file it was handed.
-The number is on the comment either way; this is only the colour of the check.
+`PITCREW_REQUIRE_FULL_COVERAGE=false` keeps a run whose agent skipped changed files green, for a
+repository that would rather have the check than the floor. The number is on the comment either way.
 
 ## Starting the acceptance test
 

@@ -130,11 +130,11 @@ describe('applyCoverageGate', () => {
   const passed = { failed: false, mark: '✅', label: 'passed', reason: 'Nothing at or above `high`.', standing: [] };
   const shortfall = measureCoverage(['a.ts', 'b.ts'], ['a.ts'], '/workspace');
 
-  it('leaves the gate alone when the repository did not ask', () => {
+  it('leaves the gate alone when the repository switched the floor off', () => {
     assert.equal(applyCoverageGate(passed, shortfall, false).failed, false);
   });
 
-  it('fails a measured shortfall when the repository asked for full coverage', () => {
+  it('fails a measured shortfall when full coverage is required', () => {
     const gate = applyCoverageGate(passed, shortfall, true);
     assert.equal(gate.failed, true);
     assert.equal(gate.kind, 'coverage');

@@ -28,7 +28,7 @@ Settings → Secrets and variables → Actions → Variables.
 | `PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST` | acceptance test | no | `PITCREW_LLM_API_MODEL` | Model for that one agent. Reading a diff and driving a browser for half an hour are different jobs. |
 | `PITCREW_FAIL_ON` | bug and security review | no | `high` | Severity from which findings fail the check: `high`, `medium`, `low`, or `never` to keep the agent advisory. Anything else is refused with a warning and `high` is used. |
 | `PITCREW_FAIL_ON_NO_REPORT` | bug and security review | no | `true` | `false` lets a run whose agent produced no usable report stay green. The default fails it, because a diff nobody reviewed is not a diff nobody found anything in. |
-| `PITCREW_REQUIRE_FULL_COVERAGE` | bug and security review | no | unset (`false`) | `true` fails the check when the agent did not open every changed file this run asked it to. The comment names the shortfall either way — `Scope: … · 7 of 29 changed files opened` — because a pass built only on hunks is not evidence. Markdown, lockfiles and deletions are not on the list, so a docs-only diff cannot go red for this. |
+| `PITCREW_REQUIRE_FULL_COVERAGE` | bug and security review | no | `true` | `false` lets a run whose agent skipped changed files stay green. The default fails it, because a pass built only on hunks is not evidence that the files were reviewed. The comment names the shortfall either way — `Scope: … · 7 of 29 changed files opened`. Markdown, lockfiles and deletions are not on the list, so a docs-only diff cannot go red for this. |
 | `PITCREW_OUTPUT_LANGUAGE` | all | no | `English` | The language the agent writes its own text in - the summary sentence, finding bodies, criteria evidence. The frame around that text is English on every run, which is why English is the default. |
 | `PITCREW_APP_ID` | all | no | none | Id of a GitHub App. When set, comments carry that app's name and avatar instead of `github-actions[bot]`. Needs `PITCREW_APP_PRIVATE_KEY` as well. |
 | `PITCREW_ACCEPTANCE_TARGET_URL` | acceptance test | yes for that agent | none | The deployed application the agent drives. Without it the run stops with an error rather than pretending to test something. |
@@ -170,7 +170,7 @@ in the workspace that has kept its credentials and was made with `fetch-depth: 0
 | `app-private-key` | no | `''` | Private key belonging to `app-id`. |
 | `fail-on` | no | `''` (means `high`) | Severity from which findings fail the check. |
 | `fail-on-no-report` | no | `''` (means `true`) | `false` lets a run without a usable report stay green. |
-| `require-full-coverage` | no | `''` (means `false`) | `true` fails the check when the agent did not open every changed file this run asked it to. |
+| `require-full-coverage` | no | `''` (means `true`) | `false` lets a run whose agent skipped changed files stay green. |
 | `target-url` | no | `''` | The deployed application an agent with a browser should drive. Required when the agent's manifest lists the `target` input. |
 | `target-username` | no | `''` | Account for the application under test. |
 | `target-password` | no | `''` | Password for it. |

@@ -29,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `PITCREW_REQUIRE_FULL_COVERAGE`. When `true`, a measured shortfall that survives the extra turn
-  fails the check. Default is off: the unread files are still named. An unreadable session export
+- `PITCREW_REQUIRE_FULL_COVERAGE`. A measured shortfall that survives the extra turn fails the
+  check. `false` keeps the number on the comment and the check green. An unreadable session export
   is a warning and no number, never a silent `N of N`.
 
 ### Changed

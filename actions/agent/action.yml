@@ -92,9 +92,9 @@ inputs:
     default: ''
   require-full-coverage:
     description: >-
-      `true` fails the check when the agent did not open every changed file
-      this run asked it to. Default: the shortfall is named on the comment
-      and the check stays green.
+      `false` lets a run whose agent skipped changed files stay green.
+      Default: it fails, because a pass built only on hunks is not evidence
+      that the files were reviewed.
     required: false
     default: ''
   target-url:
@@ -483,7 +483,7 @@ runs:
     # session — open the missing files, write the report again — and the
     # number goes on the comment either way. Nothing here fails the job:
     # publish-report.mjs does that, after the findings are on the pull
-    # request, and only when the repository set PITCREW_REQUIRE_FULL_COVERAGE.
+    # request, unless the repository set PITCREW_REQUIRE_FULL_COVERAGE=false.
     - name: Open the files the agent skipped
       if: ${{ !cancelled() }}
       shell: bash

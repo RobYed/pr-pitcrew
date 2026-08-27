@@ -175,14 +175,13 @@ const failOnNoReport = (process.env.PITCREW_FAIL_ON_NO_REPORT ?? 'true').trim().
  * Whether a measured shortfall — files the agent was handed and did not open —
  * fails the check.
  *
- * No by default: the number still goes on the comment, which is what makes a
- * shallow run and a thorough one look different, and a repository that wants
- * the check red has to ask. The same shape as `PITCREW_FAIL_ON_NO_REPORT`,
- * inverted: that one defaults to failing because a missing report is not a
- * clean review, this one defaults to naming the gap because not every
- * consumer is ready to spend the extra turn on every shallow model.
+ * Yes by default, in the same shape as `PITCREW_FAIL_ON_NO_REPORT`: a pass
+ * built only on hunks is not evidence that the files were reviewed, and
+ * reading that as "no findings" makes the gate blind in exactly the case this
+ * floor exists for. `false` keeps the number on the comment and the check
+ * green, for a repository that would rather have the check than the floor.
  */
-const requireFullCoverage = (process.env.PITCREW_REQUIRE_FULL_COVERAGE ?? '').trim().toLowerCase() === 'true';
+const requireFullCoverage = (process.env.PITCREW_REQUIRE_FULL_COVERAGE ?? 'true').trim().toLowerCase() !== 'false';
 
 const coverageFile =
   (process.env.COVERAGE_FILE ?? '').trim() || join(process.env.GITHUB_WORKSPACE ?? '.', '.pitcrew-run', 'coverage.json');

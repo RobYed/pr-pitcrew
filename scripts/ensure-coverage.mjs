@@ -21,8 +21,9 @@
  * not read would put the hole back.
  *
  * Nothing here may fail the job. A shortfall that survives the extra turn is
- * published, named, and — when the repository asked for it — failed by
- * `publish-report.mjs`, after the findings are on the pull request.
+ * published, named, and — unless the repository set
+ * `PITCREW_REQUIRE_FULL_COVERAGE=false` — failed by `publish-report.mjs`, after
+ * the findings are on the pull request.
  *
  * Environment: CHANGED_FILES, COVERAGE_FILE, GITHUB_WORKSPACE, MODEL,
  * PITCREW_LLM_API_KEY, PITCREW_LLM_API_BASE_URL, OPENCODE_CONFIG_CONTENT
