@@ -198,11 +198,29 @@ page a step writes. The transcript therefore redacts any value it can see under 
 like a secret (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`), and `TRANSCRIPT_REDACT` adds
 names that do not sound like one - which is how a test account's e-mail address is covered.
 
+## Runs are assumed not to share a runner
+
+When the agent writes no report itself, [`scripts/ensure-report.mjs`](../scripts/ensure-report.mjs)
+recovers one from OpenCode's newest session - and "newest" means newest in the runner's home
+directory. Nothing ties a session to the job that created it.
+
+On a GitHub-hosted runner that is exact anyway: the VM is fresh, OpenCode is installed by the run
+that then uses it, and the only session on the machine is this run's. On a **self-hosted runner that
+is not ephemeral**, sessions outlive the job that made them. A run whose agent dies before opening
+one recovers from whatever was left behind instead - and if that is another repository's job, that
+repository's findings are published on this pull request.
+
+Tracked as [issue #11](https://github.com/RobYed/pr-pitcrew/issues/11). Until it is fixed, the
+mitigation is below.
+
 ## Recommended hardening for consumers
 
 - **Put the jobs that hold secrets into a GitHub environment with a required reviewer.** Then a
   person decides before a diff reaches a model. This is the single most useful thing you can add,
   and it is entirely on your side of the line.
+- **Give Pitcrew an ephemeral runner**, or one no other repository uses. GitHub-hosted runners are
+  ephemeral and need nothing. A reused self-hosted runner can publish another repository's findings
+  on your pull request; see above.
 - **Pin this package to a commit SHA** and let Dependabot propose the bumps.
 - **Keep `contents: read`.** The examples do; there is no reason to widen it.
 - **Do not put the acceptance reviewer account in `CODEOWNERS`.** GitHub would request it on every

@@ -327,7 +327,10 @@ so everything such a run *did* find is gone. Three answers, and all three were n
    the prompt, the diff, or a tool output is ignored: that is quoted input, not a submitted report,
    and taking it would let a `pass` in a fixture inside the reviewed diff mint a green gate. Earlier
    assistant messages are ignored too, and so are user messages - the prompt contains a worked
-   example, and publishing that as the review would be a special kind of embarrassing.
+   example, and publishing that as the review would be a special kind of embarrassing. Which session
+   that is comes from `session list`, so it is the newest on the *machine* rather than this job's -
+   exact on a fresh runner, a caveat on a reused one
+   ([`docs/threat-model.md`](threat-model.md), "Runs are assumed not to share a runner").
 3. **Still nothing? The same session gets one more turn**, asked to call `write_report` - not to
    write a file, which is the instruction it has already ignored. `opencode run --continue`, so the
    agent still has the diff and its findings in context. It is not a second review, it cannot fail
