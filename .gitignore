@@ -6,3 +6,4 @@ node_modules/
 # never committed. Here it is checked in because this repository is also the
 # one that runs the agents on itself.
 .pitcrew-run/
+.idea
