@@ -63,6 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session sharing is refused in the generated configuration
   (`"share": "disabled"`) rather than only through an action input the CLI does
   not have.
+- The acceptance test states its own trust rule instead of inheriting one. Two
+  of its three triggers are a gesture by somebody the repository already trusts
+  - requesting a reviewer needs write or triage access, and the `/acceptance`
+  comment reads the commenter's association. The third, an ordinary
+  `pull_request` as an orchestrator calls it, was caught downstream by the
+  runtime's actor check, and on that path a run no longer goes through it. Since
+  this is the agent with a shell, the model key and the credentials of the
+  environment under test, that branch of the workflow's `if:` now requires the
+  pull request's `author_association` to be `OWNER`, `MEMBER` or `COLLABORATOR`.
+  `docs/threat-model.md` says what that is worth: it keeps an outsider's pull
+  request from starting the agent unattended, and it does not tell a read-only
+  collaborator from a writer.
 
 ## [1.0.0] - 2026-08-24
 

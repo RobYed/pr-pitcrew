@@ -33,8 +33,15 @@ the event is trusted - and where bot-authored pull requests are a normal way tho
 - [`docs/threat-model.md`](../threat-model.md) opens by saying that against an author who can push,
   nothing here is a boundary.
 
-What is genuinely given up is small, and it is not code execution: somebody with read-only access can
-open a pull request from an existing branch and spend model budget.
+What is genuinely given up is small, and for the two review agents it is not code execution: somebody
+with read-only access can open a pull request from an existing branch and spend model budget.
+
+The acceptance agent is the exception, because it has a shell, the model key and the credentials of
+the environment under test, and it works from a linked issue it did not choose. Its trust rule was
+enforced by that actor check on the one trigger where nobody else was checking - an ordinary
+`pull_request`, which is how an orchestrator calls it. `acceptance-test.yml` now states the rule
+itself on that branch of its `if:`, with `author_association`; the threat model says what that is
+worth and what it is not.
 
 ## Decision
 

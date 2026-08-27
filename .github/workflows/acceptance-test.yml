@@ -87,6 +87,21 @@ concurrency:
 jobs:
   acceptance:
     name: Pitcrew / Acceptance Test
+    # Three ways in, and the third one carries a check the other two get for
+    # free. Requesting a reviewer needs write or triage access, and the comment
+    # trigger reads the commenter's association - but an ordinary
+    # `pull_request`, the branch an orchestrator uses, is authored by whoever
+    # opened it. That used to be caught downstream: the OpenCode runtime refused
+    # an actor without write access. On `pull_request` the run no longer goes
+    # through that check (see ADR 9), and this is the one agent for which that
+    # matters - it has a shell, the model key and the credentials of the
+    # environment under test, and it works from a linked issue it did not
+    # choose. So the rule the threat model states for it is stated here too.
+    #
+    # `author_association` is GitHub's coarse answer: it says collaborator, not
+    # collaborator-with-write. It keeps an outsider's pull request from starting
+    # this agent by itself, which is what was lost; it does not distinguish a
+    # read-only collaborator. docs/threat-model.md says so.
     if: >-
       (github.event_name == 'pull_request' &&
        github.event.action == 'review_requested' &&
@@ -98,7 +113,8 @@ jobs:
         github.event.requested_team.name == vars.PITCREW_ACCEPTANCE_REVIEWER)) ||
       (github.event_name == 'pull_request' &&
        github.event.action != 'review_requested' &&
-       github.event.pull_request.draft == false) ||
+       github.event.pull_request.draft == false &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)) ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&
        github.event.comment.user.type != 'Bot' &&

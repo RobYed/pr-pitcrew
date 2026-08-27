@@ -77,8 +77,21 @@ Concretely:
   issue; on a comment-triggered run the pull request's title, body and comments reach the prompt as
   well. `PITCREW_ACCEPTANCE_ALLOW_PUBLIC=true` turns the refusal off. Set it only if the previous
   sentence describes a risk you accept.
-- The two review agents are unaffected by that and keep running in public repositories, because the
-  analysis above holds for them: hostile text has nowhere to go.
+- **A pull request that starts it by itself must come from a collaborator.** The `review_requested`
+  trigger is already a write-or-triage gesture, and the `/acceptance` comment reads the commenter's
+  association. The third way in - an ordinary `pull_request`, which is how an orchestrator calls this
+  workflow - used to be caught downstream by the runtime's actor check, and on that path the run no
+  longer goes through it. So `acceptance-test.yml` states the rule itself: the pull request's
+  `author_association` must be `OWNER`, `MEMBER` or `COLLABORATOR`.
+
+  Read what that is worth: `author_association` says collaborator, not collaborator-with-write. It
+  keeps an outsider's pull request from starting this agent unattended, which is what the runtime
+  check was doing here. It does not tell a read-only collaborator from a writer, and it is not a
+  boundary against either: a maintainer requesting the reviewer on somebody's pull request runs the
+  agent against that pull request's linked issue, which is the trigger working as designed. The
+  refusal in a public repository above is the line that matters.
+- The two review agents are unaffected by all of that and keep running in public repositories,
+  because the analysis above holds for them: hostile text has nowhere to go.
 
 ## Forks
 
@@ -133,9 +146,13 @@ in a footnote.
   somebody with write access pushed it. See
   [ADR 9](adr/0009-the-pull-request-path-runs-the-cli.md).
 
-  What is given up is not code execution: a user with **read** access can open a pull request from an
-  existing branch and spend model budget. If that matters in your repository, add the check to your
-  own workflow rather than relying on the runtime's - something like
+  For the two review agents what is given up is not code execution: a user with **read** access can
+  open a pull request from an existing branch and spend model budget. They have no shell, no
+  `webfetch` and no way to read the process environment, so that is the whole of it. **For the
+  acceptance agent it is not**, and that difference is handled where it arises - see "What the
+  acceptance agent may do" above, which is where its own trigger check now lives. If the budget
+  matters in your repository, add the check to your own workflow rather than relying on the
+  runtime's - something like
 
   ```yaml
   if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)

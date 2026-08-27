@@ -137,8 +137,11 @@ severity to hold against a threshold, and the workflow sets `fail-on: never` for
 
 Triggers: `review_requested` naming the account or team in `PITCREW_ACCEPTANCE_REVIEWER`; an
 `issue_comment` containing `/acceptance` from an `OWNER`, `MEMBER` or `COLLABORATOR`; or, when the
-workflow is called from an orchestrator on an ordinary `pull_request` event, that event, provided
-the pull request is not a draft.
+workflow is called from an orchestrator on an ordinary `pull_request` event, that event - provided
+the pull request is not a draft and its author's association is `OWNER`, `MEMBER` or `COLLABORATOR`.
+That last condition is only on that trigger, because the other two are a gesture by somebody the
+repository already trusts; see [threat-model.md](threat-model.md), "What the acceptance agent may
+do".
 
 Job permissions: `contents: read`, `pull-requests: write`, `issues: write`, and `actions: read` -
 the last so the summary comment can carry a download link to the artifact this run uploads, whose id

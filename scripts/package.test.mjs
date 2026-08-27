@@ -201,6 +201,31 @@ describe('the agent action', () => {
   });
 });
 
+describe('the acceptance test, which is the agent with a shell', () => {
+  const workflow = read('.github/workflows', 'acceptance-test.yml');
+
+  it('lets no pull request start it by itself unless its author is a collaborator', () => {
+    // Its other two triggers are a gesture by somebody the repository trusts:
+    // requesting a reviewer needs write or triage access, and the comment
+    // trigger reads the commenter's association. An ordinary `pull_request` -
+    // how an orchestrator calls this workflow - is authored by whoever opened
+    // it, and that used to be caught downstream by the runtime's actor check.
+    // A `pull_request` no longer goes through that check (ADR 9), and this is
+    // the one agent for which it mattered: it has a shell, the model key and
+    // the credentials of the environment under test.
+    assert.match(
+      workflow,
+      /contains\(fromJSON\('\["OWNER","MEMBER","COLLABORATOR"\]'\), github\.event\.pull_request\.author_association\)/,
+      'nothing keeps an outsider\'s pull request from starting the acceptance agent',
+    );
+  });
+
+  it('still refuses a public repository', () => {
+    // The line that actually matters, and the one a variable can turn off.
+    assert.match(workflow, /PITCREW_ACCEPTANCE_ALLOW_PUBLIC != 'true'/);
+  });
+});
+
 describe('self-references', () => {
   it('point at @main on the branch, so the package reviews its own pull requests with its own code', () => {
     for (const name of readdirSync(join(root, '.github/workflows'))) {
