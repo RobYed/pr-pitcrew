@@ -809,7 +809,7 @@ and one run had the first without the second. Nothing checked, so the agent met 
 an hour of a job that held the model key went into fetching a package and looking for a way around
 its own permissions, and no verdict was written. `actions/check-browser` now resolves the driver -
 `PITCREW_PLAYWRIGHT_MODULE` first, then the known locations, `npm root -g` and a depth-limited
-search - and starts Chromium with it. A `stat` would not do: a package that resolves but cannot
+search of named roots, never the workspace - and starts Chromium with it. A `stat` would not do: a package that resolves but cannot
 start the browser fails at the same point in the run as no package at all. The proven path is
 exported, so the recorder loads what the preflight loaded. Nothing is installed at run time; a
 driver fetched into this job would land next to the model key and the credentials of the environment

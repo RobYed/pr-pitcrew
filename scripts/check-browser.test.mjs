@@ -16,12 +16,20 @@ describe('where the browser preflight looks', () => {
     assert.ok(found.length > 1);
   });
 
-  it('asks the image before the workspace, and the workspace before a search', () => {
+  it('never looks in the workspace, which is the branch under review', () => {
+    // `prove()` calls `require()`. A candidate under the workspace would be the
+    // reviewed branch's own code running in this job, before the fork refusal
+    // in actions/agent has said a word - the one rule this package rests on.
     const found = candidates({ GITHUB_WORKSPACE: '/work' });
-    const how = found.map(entry => entry.how);
+    for (const { path } of found) {
+      assert.ok(!path.startsWith('/work'), `${path} is inside the workspace`);
+    }
+  });
+
+  it('asks the image before it asks anything else', () => {
+    const how = candidates({ GITHUB_WORKSPACE: '/work' }).map(entry => entry.how);
     assert.equal(how[0], 'a known location');
-    assert.ok(how.indexOf('the workspace') > how.indexOf('a known location'));
-    assert.ok(how.lastIndexOf('a known location') < how.indexOf('the workspace'));
+    assert.ok(how.indexOf('a bounded search') === -1 || how.indexOf('a bounded search') > how.indexOf('the module path'));
   });
 
   it('prefers playwright-core, which is the package the recorder loads', () => {
@@ -30,7 +38,7 @@ describe('where the browser preflight looks', () => {
   });
 
   it('names every path once', () => {
-    const paths = candidates({ GITHUB_WORKSPACE: '/work' }).map(entry => entry.path);
+    const paths = candidates({}).map(entry => entry.path);
     assert.equal(paths.length, new Set(paths).size);
   });
 

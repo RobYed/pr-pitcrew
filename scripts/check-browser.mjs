@@ -42,6 +42,19 @@ const ROOTS = ['/ms-playwright-agent/node_modules', '/usr/lib/node_modules', '/u
  *
  * An override comes first and alone: a consumer who names a path has answered
  * this question, and searching past a wrong answer would hide it.
+ *
+ * **The workspace is not on this list**, and every entry below is chosen to
+ * stay out of it. `prove()` calls `require()`, and the workspace is the branch
+ * under review - a candidate there would be that branch's code running in this
+ * job, before the fork refusal in `actions/agent` has said a word. It is the
+ * rule the whole package rests on: the repository under review contributes
+ * configuration, instructions and code to nothing. A driver it shipped itself
+ * would be no different from an `.opencode/tool/*.js`.
+ *
+ * The bare specifier is safe for the same reason: `createRequire` resolves it
+ * from this package's checkout and walks up from there, which never descends
+ * into the workspace. `search()` names its roots and none of them is one
+ * either.
  */
 export function candidates(env = process.env) {
   const override = (env.PLAYWRIGHT_MODULE ?? '').trim();
@@ -53,7 +66,6 @@ export function candidates(env = process.env) {
   };
 
   for (const root of ROOTS) for (const name of NAMES) add('a known location', join(root, name));
-  if (env.GITHUB_WORKSPACE) for (const name of NAMES) add('the workspace', join(env.GITHUB_WORKSPACE, 'node_modules', name));
   // Bare specifiers honour NODE_PATH, which is how the image is meant to work.
   for (const name of NAMES) add('the module path', name);
 
@@ -75,6 +87,7 @@ function globalRoot() {
  * is what the agent did, and it took longer than the run had.
  */
 function search() {
+  // Named roots, never `/` and never the workspace: see candidates().
   const roots = ['/ms-playwright-agent', '/usr/lib', '/usr/local/lib', '/opt'].filter(root => existsSync(root));
   if (roots.length === 0) return [];
 

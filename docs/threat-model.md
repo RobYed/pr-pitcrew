@@ -186,6 +186,13 @@ and untrusted code arriving through a door nobody had to open. The agent may sti
 `AGENTS.md` in the checkout as a file if it wants to; it is no longer handed to it as instructions.
 `~/.config/opencode/` is unaffected, which is where the report tool this package installs lives.
 
+The same rule holds for the browser preflight, which is the one other place that calls `require()`.
+`actions/check-browser` looks in the image, on the module path, under `npm root -g` and in a
+depth-limited search of named roots. **The workspace is not one of them.** A driver found there
+would be the reviewed branch's own code, loaded before the fork refusal in `actions/agent` has run.
+An image that keeps its driver somewhere else is served by `PITCREW_PLAYWRIGHT_MODULE`, which a
+maintainer sets and a pull request cannot.
+
 ## The comment trigger reads the base branch's configuration
 
 On `pull_request`, the workflow, the pinned ref and the prompt are the pull request's own files
