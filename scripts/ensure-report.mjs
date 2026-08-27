@@ -11,6 +11,15 @@
  *      the prompt, the diff, or a tool output). Write it out. No model call.
  *   3. Ask the same session to call `write_report`. One turn, not a new review.
  *
+ * Step 3 needs a session, and needs it proven rather than assumed. `opencode run
+ * --continue` with nothing to continue does not fail - it opens a *new* session
+ * whose only instruction is to call `write_report`, and a model answering that
+ * from an empty context writes an empty pass. That report is indistinguishable
+ * from a real one by the time it reaches the pull request, so a run whose agent
+ * died before it started would publish "no defects found" for a diff nobody
+ * read. The id from `session list` is the evidence, and without it this script
+ * stops: a run that reviewed nothing is published as one that reviewed nothing.
+ *
  * Nothing here may fail the job. A rescue that fails leaves the state
  * publish-report.mjs already knows how to describe.
  *
@@ -54,13 +63,24 @@ function parseJson(raw, what) {
   }
 }
 
+/**
+ * `{ id, session }`, and the two are not the same question.
+ *
+ * `id` answers "did OpenCode leave a session behind": it is what makes
+ * `--continue` a continuation. `session` is that session's content, and it may
+ * be null while `id` is set - an export that failed or came back as something
+ * other than JSON leaves the session itself perfectly continuable, just
+ * unreadable from here. Nothing to recover from, still something to continue.
+ *
+ * Both null is the case that matters: no evidence of a session at all.
+ */
 function loadSession() {
   if (exportFile) {
     if (!existsSync(exportFile)) {
       console.log(`::warning::SESSION_EXPORT points at ${exportFile}, which does not exist.`);
-      return null;
+      return { id: null, session: null };
     }
-    return parseJson(readFileSync(exportFile, 'utf8'), exportFile);
+    return { id: exportFile, session: parseJson(readFileSync(exportFile, 'utf8'), exportFile) };
   }
 
   let listed;
@@ -72,19 +92,19 @@ function loadSession() {
     });
   } catch (error) {
     console.log(`::warning::Could not list OpenCode sessions: ${error.shortMessage ?? error.message}`);
-    return null;
+    return { id: null, session: null };
   }
 
   const sessions = parseJson(listed, 'the session list');
   if (!Array.isArray(sessions) || sessions.length === 0) {
     console.log('::warning::OpenCode left no session behind, so there is nothing to recover a report from.');
-    return null;
+    return { id: null, session: null };
   }
 
   const newest = [...sessions].sort((a, b) => (b?.updated ?? 0) - (a?.updated ?? 0))[0];
   if (!newest?.id) {
     console.log('::warning::The session list carries no id.');
-    return null;
+    return { id: null, session: null };
   }
 
   const target = join(process.env.RUNNER_TEMP || tmpdir(), 'pitcrew-report-session.json');
@@ -97,13 +117,13 @@ function loadSession() {
     });
   } catch (error) {
     console.log(`::warning::Could not export session ${newest.id}: ${error.shortMessage ?? error.message}`);
-    return null;
+    return { id: newest.id, session: null };
   } finally {
     closeSync(handle);
   }
 
   console.log(`Exported session ${newest.id} (${statSync(target).size} bytes) to look for a report.`);
-  return parseJson(readFileSync(target, 'utf8'), `the export of ${newest.id}`);
+  return { id: newest.id, session: parseJson(readFileSync(target, 'utf8'), `the export of ${newest.id}`) };
 }
 
 function extraUntrusted() {
@@ -147,10 +167,24 @@ try {
 
   if (alreadyWritten()) process.exit(0);
 
-  const session = loadSession();
+  const { id: sessionId, session } = loadSession();
   const recovered = session ? recoverReport(session, reportFile, extraUntrusted()) : null;
   if (recovered) {
     saveRecovered(recovered);
+    process.exit(0);
+  }
+
+  // The one place where doing nothing is the whole feature. `--continue` does
+  // not object to having nothing to continue: it starts a fresh session, and a
+  // model asked for a report with no diff in front of it produces a confident
+  // empty pass. So the turn is spent on evidence of a session, never on the
+  // absence of evidence - the listing failing is as unproven as the listing
+  // being empty. What is upstream of that is anything at all: a permission
+  // abort, a failed install, a wrong model id, a dropped connection.
+  if (!sessionId) {
+    console.log(
+      '::warning::No session from this run, so there is nothing to continue and no review to ask for. This run is published as one that reviewed nothing.',
+    );
     process.exit(0);
   }
 
@@ -169,7 +203,7 @@ try {
     process.exit(0);
   }
 
-  const after = loadSession();
+  const { session: after } = loadSession();
   const recoveredAfter = after ? recoverReport(after, reportFile, extraUntrusted()) : null;
   if (recoveredAfter) {
     saveRecovered(recoveredAfter);

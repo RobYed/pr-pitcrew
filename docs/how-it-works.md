@@ -334,13 +334,22 @@ so everything such a run *did* find is gone. Three answers, and all three were n
    the job, and the transcript stays one session. Afterwards the session is read again, in case the
    tool was called but the file still went missing.
 
+   **This turn requires a session, and the requirement is checked rather than assumed.** `--continue`
+   with nothing to continue does not fail: it opens a *new* session whose only instruction is to call
+   `write_report`, and a model answering that with no diff in front of it writes a confident empty
+   pass. The id from `session list` is the evidence that a session exists; without it this step is
+   skipped and the run is published as one that reviewed nothing. An unreadable session still counts
+   as one - an export that failed says nothing about whether the review happened, and that turn is
+   what the whole step is for.
+
 **Still nothing after that? The run fails, and says which kind of failure it is.** The comment is
 headed `— no report` rather than a verdict, the gate line says the diff was not reviewed, and the
 exit code is a different one. An infrastructure failure does not look like a passed gate, and a
 passed gate does not look like a failure.
 
 Deliberately **not** done: writing an empty report file up front. It would turn every failed run
-into a clean pass, which is the one confusion this entire section exists to prevent.
+into a clean pass, which is the one confusion this entire section exists to prevent. The recovery
+turn above once did the same thing by a longer route, which is why it now checks for a session first.
 
 ## The summary comment and its fixed frame
 

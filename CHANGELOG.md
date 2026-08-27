@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A run whose agent step died before OpenCode had a session no longer publishes
+  an invented `verdict: pass`. `ensure-report.mjs` asked for the report with
+  `opencode run --continue`; with nothing to continue, that opens a *new*
+  session whose only instruction is to call `write_report`, and a model with no
+  diff in front of it answers "no defects found". The pull request then carried
+  a passed quality gate for a review that never ran. The recovery turn now needs
+  a session id from `session list` before it spends anything, and a run without
+  one is published as what it is: a run that reviewed nothing.
+
 ## [1.0.0] - 2026-08-24
 
 First public release.
