@@ -58,9 +58,10 @@ With the runner's built-in `GITHUB_TOKEN`, comments are posted by `github-action
 name cannot be changed. To use your own:
 
 1. Create a GitHub App with the permissions **Contents: read**, **Pull requests: write**, **Issues:
-   write**, **Metadata: read** and **Administration: read**. The last one is not optional: before
-   every run OpenCode checks whether the triggering user may write to the repository, and that check
-   reads collaborator permissions.
+   write** and **Metadata: read**. Add **Administration: read** if you use the comment triggers:
+   there OpenCode checks whether the commenter may write to the repository, and that check reads
+   collaborator permissions. A `pull_request` run does not go through it - see
+   [threat-model.md](threat-model.md), "Who may trigger a run".
 2. Install it on the repository and generate a private key.
 3. Set `PITCREW_APP_ID` and pass the key as `app-private-key`.
 
@@ -136,8 +137,11 @@ severity to hold against a threshold, and the workflow sets `fail-on: never` for
 
 Triggers: `review_requested` naming the account or team in `PITCREW_ACCEPTANCE_REVIEWER`; an
 `issue_comment` containing `/acceptance` from an `OWNER`, `MEMBER` or `COLLABORATOR`; or, when the
-workflow is called from an orchestrator on an ordinary `pull_request` event, that event, provided
-the pull request is not a draft.
+workflow is called from an orchestrator on an ordinary `pull_request` event, that event - provided
+the pull request is not a draft and its author's association is `OWNER`, `MEMBER` or `COLLABORATOR`.
+That last condition is only on that trigger, because the other two are a gesture by somebody the
+repository already trusts; see [threat-model.md](threat-model.md), "What the acceptance agent may
+do".
 
 Job permissions: `contents: read`, `pull-requests: write`, `issues: write`, and `actions: read` -
 the last so the summary comment can carry a download link to the artifact this run uploads, whose id

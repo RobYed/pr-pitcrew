@@ -153,10 +153,13 @@ Both are supported. `@v1` is the convenient one, a SHA is the deliberate one.
 
 ### Your project's rules are the review's rules
 
-The agents read your repository's `AGENTS.md` (or `CLAUDE.md`) on their own, because the runtime
-loads it, and the prompts tell them a rule written there outranks their general expectations about
-how such code is usually written. Nothing has to be written down twice, and nothing drifts: it is
-the same file your own coding agent reads.
+The prompts send the agents to your repository's `AGENTS.md` (or `CLAUDE.md`) and tell them that a
+rule written there outranks their general expectations about how such code is usually written.
+Nothing has to be written down twice, and nothing drifts: it is the same file your own coding agent
+reads. They open it with their own read tool, so the run's transcript shows that they did - the
+runtime is deliberately not allowed to fold a file from the branch under review into its system
+prompt. See [`docs/threat-model.md`](docs/threat-model.md), "The branch under review configures
+nothing".
 
 For what belongs to one agent and is not a project rule, append to its prompt rather than forking
 it - see [`docs/adding-an-agent.md`](docs/adding-an-agent.md).

@@ -14,3 +14,4 @@ a new record that supersedes the old one.
 | [6](0006-english-by-default.md) | Agents write in English by default, and the operator can override it |
 | [7](0007-what-is-deliberately-not-in-the-first-release.md) | What is deliberately not in the first release |
 | [8](0008-a-clean-first-commit.md) | A clean first commit, with the origin stated |
+| [9](0009-the-pull-request-path-runs-the-cli.md) | A `pull_request` runs the OpenCode CLI; a comment keeps the action |

@@ -143,6 +143,11 @@ export function buildConfig({ agent, profile, model, temperature, description })
         models: { [bare]: { name: bare } },
       },
     },
+    // Sharing uploads the session transcript - somebody's diff - to
+    // opencode.ai. The wrapper action takes `share: 'false'` as an input; the
+    // CLI has no such input and would go by configuration, so the refusal is
+    // written here, where both paths read it. See docs/threat-model.md.
+    share: 'disabled',
     permission: { external_directory: 'deny', write_report: 'allow' },
     // This, not the action's `agent` input, is what picks the agent.
     default_agent: agent,

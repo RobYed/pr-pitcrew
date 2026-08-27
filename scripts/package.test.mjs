@@ -136,6 +136,96 @@ describe('permission profiles', () => {
   });
 });
 
+describe('the agent action', () => {
+  // Comments first: every step here explains itself at length, and one of those
+  // paragraphs names `pull_request` in prose. Shell comments inside a `run:`
+  // block go with them, which costs these assertions nothing.
+  const action = read('actions', 'agent', 'action.yml')
+    .split('\n')
+    .filter(line => !/^\s*#/.test(line))
+    .join('\n');
+
+  // Steps of a composite action, split on the list marker they all start with.
+  const steps = action
+    .slice(action.indexOf('\n  steps:'))
+    .split(/\n {4}- /)
+    .slice(1);
+
+  const cli = steps.find(step => step.includes('opencode run'));
+  const wrapper = steps.find(step => step.includes('uses: anomalyco/opencode/github'));
+
+  it('runs a pull request through the CLI, and everything else through the action', () => {
+    // `opencode github run` asserts the *actor* has write access, and GitHub's
+    // collaborator API answers `none` for every GitHub App bot - so a pull
+    // request opened by one died before the model saw the diff. The event
+    // decides the path, not the actor: a bot-shaped carve-out would give the
+    // less trusted actor the shorter route.
+    assert.ok(cli, 'no step invokes the OpenCode CLI');
+    assert.ok(wrapper, 'no step invokes the OpenCode GitHub action');
+    assert.match(cli, /if: github\.event_name == 'pull_request'/);
+    assert.match(wrapper, /if: github\.event_name != 'pull_request'/);
+  });
+
+  it('names the agent on the CLI rather than trusting a fallback', () => {
+    assert.match(cli, /--agent/);
+  });
+
+  it('keeps the repository token out of the process that reads the diff', () => {
+    // The CLI talks to no API. Everything on the pull request is published by
+    // the steps after it, from their own environment.
+    assert.equal(cli.includes('GITHUB_TOKEN'), false, 'the CLI step carries a token it does not need');
+  });
+
+  it('lets the branch under review configure the runtime in no step that starts it', () => {
+    // Without this, `opencode.json`, `AGENTS.md` and `.opencode/tool/*.js` come
+    // from the head branch - and that last one is JavaScript in the process
+    // holding the model key, for an agent that otherwise has no shell.
+    //
+    // Every step that starts the runtime, not only the one that runs the
+    // review: the recovery turn spends a model call of its own, and reading a
+    // session back is still a runtime booting in the workspace - which on the
+    // `pull_request` path *is* the branch under review. Closing the door in one
+    // step and leaving it open in the next is not closing it.
+    const starters = ['opencode run', 'uses: anomalyco/opencode/github', 'ensure-report.mjs', 'publish-transcript.mjs'];
+    for (const marker of starters) {
+      const step = steps.find(candidate => candidate.includes(marker));
+      assert.ok(step, `no step invokes ${marker}`);
+      assert.match(step, /OPENCODE_DISABLE_PROJECT_CONFIG: '1'/, `the step running ${marker} lets the branch configure the runtime`);
+    }
+  });
+
+  it('installs the runtime version this package pins on the path that installs it itself', () => {
+    const install = steps.find(step => step.includes('opencode.ai/install'));
+    assert.ok(install, 'nothing installs the OpenCode runtime for the CLI path');
+    assert.match(install, /VERSION: \$\{\{ inputs\.opencode-version \}\}/);
+  });
+});
+
+describe('the acceptance test, which is the agent with a shell', () => {
+  const workflow = read('.github/workflows', 'acceptance-test.yml');
+
+  it('lets no pull request start it by itself unless its author is a collaborator', () => {
+    // Its other two triggers are a gesture by somebody the repository trusts:
+    // requesting a reviewer needs write or triage access, and the comment
+    // trigger reads the commenter's association. An ordinary `pull_request` -
+    // how an orchestrator calls this workflow - is authored by whoever opened
+    // it, and that used to be caught downstream by the runtime's actor check.
+    // A `pull_request` no longer goes through that check (ADR 9), and this is
+    // the one agent for which it mattered: it has a shell, the model key and
+    // the credentials of the environment under test.
+    assert.match(
+      workflow,
+      /contains\(fromJSON\('\["OWNER","MEMBER","COLLABORATOR"\]'\), github\.event\.pull_request\.author_association\)/,
+      'nothing keeps an outsider\'s pull request from starting the acceptance agent',
+    );
+  });
+
+  it('still refuses a public repository', () => {
+    // The line that actually matters, and the one a variable can turn off.
+    assert.match(workflow, /PITCREW_ACCEPTANCE_ALLOW_PUBLIC != 'true'/);
+  });
+});
+
 describe('self-references', () => {
   it('point at @main on the branch, so the package reviews its own pull requests with its own code', () => {
     for (const name of readdirSync(join(root, '.github/workflows'))) {

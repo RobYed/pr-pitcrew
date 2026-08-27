@@ -9,14 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A run whose agent step died before OpenCode had a session no longer publishes
-  an invented `verdict: pass`. `ensure-report.mjs` asked for the report with
-  `opencode run --continue`; with nothing to continue, that opens a *new*
-  session whose only instruction is to call `write_report`, and a model with no
-  diff in front of it answers "no defects found". The pull request then carried
-  a passed quality gate for a review that never ran. The recovery turn now needs
-  a session id from `session list` before it spends anything, and a run without
-  one is published as what it is: a run that reviewed nothing.
+- **A pull request opened or pushed by a bot is reviewed again.** `cursor[bot]`,
+  `github-actions[bot]` and their kind used to end with `permission: none` and a
+  red check before the model saw the diff. A `pull_request` now runs through the
+  OpenCode CLI, which does not ask who the actor is; the comment triggers keep
+  the action. Nothing else about who may start a run changed - forks are still
+  refused. [ADR 9](docs/adr/0009-the-pull-request-path-runs-the-cli.md) has the
+  reasoning, `docs/threat-model.md` the one thing it gives up.
+- **A run that reviewed nothing is no longer published as `verdict: pass`.**
+  When the agent died before OpenCode had a session, the recovery turn invented
+  an empty "no defects found" review. It now needs a session before it spends
+  anything, and such a run is published as what it was.
+
+### Changed
+
+- On a `pull_request`: the pull request's title, body and comments no longer
+  reach the model, and no comment appears on the pull request until the review
+  is published. Comment-triggered runs are unchanged.
+- The acceptance test no longer starts itself for a pull request whose author is
+  not an `OWNER`, `MEMBER` or `COLLABORATOR`. Its two ordinary triggers - a
+  review request and `/acceptance` - are unaffected.
+- With a GitHub App, **Administration: read** is now only needed if you use the
+  comment triggers.
+
+### Security
+
+- **Your branch no longer configures the runtime that reviews it**: no
+  `opencode.json`, no `AGENTS.md` as system instructions, no tool under
+  `.opencode/` - that last one was JavaScript in the process holding your model
+  key. The agents still read your `AGENTS.md`; their prompts send them to it.
+- The repository token is no longer in the process that reads the diff, and
+  session sharing is refused in the configuration rather than only by an input
+  the CLI does not have.
 
 ## [1.0.0] - 2026-08-24
 

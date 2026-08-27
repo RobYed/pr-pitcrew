@@ -17,15 +17,25 @@ description: Runs one Pitcrew agent against a pull request and publishes what it
 #    `model`. None of them has a default: a repository that has not configured
 #    them stops with an error instead of falling back to something plausible
 #    and billable.
+#  * **A `pull_request` runs the OpenCode CLI; a comment trigger runs the
+#    OpenCode GitHub action.** That action refuses to start unless the
+#    *triggering actor* has write access to the repository, and a GitHub App
+#    bot never has: the collaborator API answers `none` for every one of them.
+#    A pull request opened by `cursor[bot]` or `github-actions[bot]` therefore
+#    died before the model saw the diff. Which door a run takes is decided by
+#    the event, never by who triggered it - see "Run the agent" below.
 #  * `use_github_token: true` keeps the OpenCode GitHub App and its OIDC token
-#    exchange out of the loop. The action accepts any token in GITHUB_TOKEN, so
-#    the same switch also lets a repository use its own GitHub App for a custom
-#    bot name (see `app-id`) without pulling a third-party service back in.
-#  * **The checkout that precedes this action must keep its credentials.**
-#    OpenCode fetches the pull request branch itself and, with
+#    exchange out of the loop on that comment path. The action accepts any token
+#    in GITHUB_TOKEN, so the same switch also lets a repository use its own
+#    GitHub App for a custom bot name (see `app-id`) without pulling a
+#    third-party service back in.
+#  * **The checkout that precedes this action must keep its credentials.** On
+#    the comment path OpenCode fetches the pull request branch itself and, with
 #    `use_github_token`, installs none of its own; in a private repository that
 #    fetch would fail. `contents: read` on the job is what keeps that token
-#    from pushing.
+#    from pushing. On `pull_request` nothing is fetched: the checkout GitHub
+#    already made - `refs/pull/N/merge`, the change as it would land - is what
+#    the agent reads.
 
 inputs:
   agent:
@@ -58,9 +68,9 @@ inputs:
     description: >-
       Optional GitHub App id. When set, an installation token is minted and every
       comment carries that app's name and avatar instead of github-actions[bot].
-      The app needs Contents:read, Pull requests:write, Issues:write,
-      Metadata:read and Administration:read - the last one because OpenCode
-      verifies that the triggering user may write to the repository.
+      The app needs Contents:read, Pull requests:write, Issues:write and
+      Metadata:read, plus Administration:read if you use the comment triggers -
+      there OpenCode verifies that the commenter may write to the repository.
     required: false
     default: ''
   app-private-key:
@@ -191,11 +201,12 @@ runs:
         fi
 
         # The report tool has to live in OpenCode's own config directory, not in
-        # the checkout: OpenCode fetches the pull request branch after this
-        # step, so a copy under the workspace would come from the head branch -
-        # and a comment-triggered run would then be reviewing a stranger with a
-        # tool that stranger provided. `~/.config/opencode/tools/` is loaded
-        # regardless, and this copy comes from the package.
+        # the checkout: on the comment path OpenCode fetches the pull request
+        # branch after this step, so a copy under the workspace would come from
+        # the head branch - and that run would then be reviewing a stranger with
+        # a tool that stranger provided. `~/.config/opencode/tools/` is loaded
+        # regardless, including with OPENCODE_DISABLE_PROJECT_CONFIG set, and
+        # this copy comes from the package.
         mkdir -p "$HOME/.config/opencode/tools"
         cp "$PITCREW_HOME/scripts/write_report.js" "$HOME/.config/opencode/tools/write_report.js"
 
@@ -301,6 +312,11 @@ runs:
         node "$PITCREW_HOME/scripts/build-config.mjs"
 
         echo "model=$(cat "$MODEL_OUT")" >> "$GITHUB_OUTPUT"
+        # The CLI path reads the prompt from this file rather than from the
+        # output below: `opencode run` re-quotes any argument that contains a
+        # space, so a prompt passed on the command line arrives at the model
+        # wrapped in quotation marks with its own escaped.
+        echo "prompt-file=$PROMPT_OUT" >> "$GITHUB_OUTPUT"
         {
           echo 'config<<PITCREW_CONFIG_EOF'
           cat "$CONFIG_OUT"
@@ -311,7 +327,85 @@ runs:
           echo 'PITCREW_PROMPT_EOF'
         } >> "$GITHUB_OUTPUT"
 
+    # Two doors into the same runtime, and the event decides which one - never
+    # the actor.
+    #
+    # `opencode github run` asserts that `github.actor` is a collaborator with
+    # write access. GitHub's collaborator API answers `none` for every GitHub
+    # App bot, because a bot is not a collaborator, so a pull request opened or
+    # pushed by `cursor[bot]`, `github-actions[bot]` or any other app failed
+    # there with `permission: none` before the model saw the diff. Upstream has
+    # known this for months and closed the obvious bypass as not planned.
+    #
+    # On `pull_request` that check was never what carried the weight, and the
+    # things that do are untouched: a fork gets no secrets from GitHub and is
+    # refused by assert-same-repo.mjs above, so the head branch lives in this
+    # repository - somebody with write access pushed it. What is genuinely given
+    # up is that a user with read-only access can open a pull request from an
+    # existing branch and spend model budget. A repository that minds adds an
+    # author-association check to its own workflow `if:`; see
+    # docs/threat-model.md.
+    #
+    # One path for every actor, not a bot-shaped carve-out: branching on the
+    # actor would give the *less* trusted one the shorter route, and would make
+    # bot detection security-relevant.
+    #
+    # The comment path keeps the action. There the workflow's `if:` has already
+    # authorised the commenter (OWNER, MEMBER or COLLABORATOR, and not a bot),
+    # and the reaction the action leaves on the comment is how a person sees
+    # that their `/review` arrived.
+    - name: Install the OpenCode runtime
+      if: github.event_name == 'pull_request'
+      shell: bash
+      env:
+        # The same installer the wrapper action runs, honouring the same
+        # VERSION, in a step this package can see. See docs/threat-model.md,
+        # "The supply chain": a pinned version, not a checksum.
+        VERSION: ${{ inputs.opencode-version }}
+      run: |
+        set -euo pipefail
+        curl -fsSL https://opencode.ai/install | bash
+        # Installed into $HOME/.opencode/bin, which is where ensure-report.mjs
+        # and publish-transcript.mjs look for the binary afterwards.
+        "$HOME/.opencode/bin/opencode" --version
+
     - name: Run the agent
+      if: github.event_name == 'pull_request'
+      shell: bash
+      env:
+        # As on the other path: the generated configuration refers to these as
+        # `{env:...}`, so the key never passes through a step output.
+        PITCREW_LLM_API_KEY: ${{ inputs.api-key }}
+        PITCREW_LLM_API_BASE_URL: ${{ inputs.api-base-url }}
+        OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+        # The branch under review supplies the runtime with nothing: no
+        # `opencode.json`, no `AGENTS.md` as system instructions, and above all
+        # no `.opencode/tool/*.js` - which OpenCode imports into its own
+        # process, the one holding the model key, for an agent that otherwise
+        # has no shell. `~/.config/opencode/` is unaffected, which is where the
+        # report tool this package installs lives. Set on both paths.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
+        REPORT_FILE: ${{ github.workspace }}/.pitcrew-run/report.json
+        AGENT: ${{ inputs.agent }}
+        MODEL: ${{ steps.config.outputs.model }}
+        PROMPT_FILE: ${{ steps.config.outputs.prompt-file }}
+        # No GITHUB_TOKEN here, and that is the point: on this path the runtime
+        # talks to no API, so the token is not in the process that reads a
+        # stranger's diff. Everything on the pull request is published by the
+        # steps below, from their own environment.
+      # The runtime takes its project directory from the working directory, and
+      # the workspace is where the checkout, the diff and `.pitcrew-run` are.
+      working-directory: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+
+        # The prompt goes in on stdin, verbatim. As an argument it would be
+        # re-quoted by the CLI; see "Build the configuration and the prompt".
+        echo "opencode run --agent $AGENT --model $MODEL  # prompt: $PROMPT_FILE"
+        "$HOME/.opencode/bin/opencode" run --agent "$AGENT" --model "$MODEL" < "$PROMPT_FILE"
+
+    - name: Run the agent through the OpenCode action
+      if: github.event_name != 'pull_request'
       uses: anomalyco/opencode/github@2c14fc5586fe0b88e5c04732d2e846769cc35671 # latest
       env:
         # Endpoint and key reach OpenCode as environment variables rather than
@@ -333,6 +427,9 @@ runs:
         # with it every permission in its profile. Merged over anything the
         # runtime would otherwise read from the checked-out branch.
         OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+        # See the CLI step above: the head branch contributes no configuration,
+        # no instructions and no custom tools on either path.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
       with:
         model: ${{ steps.config.outputs.model }}
         # Passed for the day this input starts working again. In the pinned
@@ -364,6 +461,12 @@ runs:
         PITCREW_LLM_API_KEY: ${{ inputs.api-key }}
         PITCREW_LLM_API_BASE_URL: ${{ inputs.api-base-url }}
         OPENCODE_CONFIG_CONTENT: ${{ steps.config.outputs.config }}
+        # This step spends a model turn of its own, in the workspace - which on
+        # the `pull_request` path is the branch under review. Every step that
+        # starts the runtime sets this, or the door the run step closed stands
+        # open in the one place a run reaches only when something has already
+        # gone wrong.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
       run: node "$PITCREW_HOME/scripts/ensure-report.mjs"
 
     # Always: a run that went wrong is exactly when the video and the logs are
@@ -413,4 +516,9 @@ runs:
         # own; a test account's address is neither, and is a secret all the
         # same. A step summary is not masked the way the log is.
         TRANSCRIPT_REDACT: PITCREW_ACCEPTANCE_TARGET_USERNAME
+        # `session list` and `export` read rather than think, but they start the
+        # runtime in the workspace all the same, and loading a project's
+        # configuration is where a branch's plugins get installed. Same rule as
+        # the two steps above: whoever starts the runtime sets this.
+        OPENCODE_DISABLE_PROJECT_CONFIG: '1'
       run: node "$PITCREW_HOME/scripts/publish-transcript.mjs"

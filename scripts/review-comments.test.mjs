@@ -180,6 +180,15 @@ describe('pickSummaryTarget', () => {
     assert.deepEqual(superseded, []);
   });
 
+  // The ordinary case on the `pull_request` path: the CLI posts nothing, so
+  // there is no reply to rewrite and publish-report.mjs has to fall through to
+  // creating the comment itself. Nothing to claim, nothing to delete.
+  it('claims nothing when the run left no comment behind', () => {
+    const { existing, superseded } = pickSummaryTarget([], titled);
+    assert.equal(existing, null);
+    assert.deepEqual(superseded, []);
+  });
+
   it('does not rewrite a human comment that quotes the run link', () => {
     const ours = bot({
       id: 1,

@@ -72,12 +72,26 @@ environment under test.
 So the acceptance agent gets a different rule: run it only where the pull request author is trusted.
 Concretely:
 
-- **In a public repository it refuses to start.** The runtime puts the pull request's title, body and
-  comments into the prompt, and in a public repository anybody with a GitHub account can write those.
-  `PITCREW_ACCEPTANCE_ALLOW_PUBLIC=true` turns the refusal off. Set it only if the previous sentence
-  describes a risk you accept.
-- The two review agents are unaffected by that and keep running in public repositories, because the
-  analysis above holds for them: hostile text has nowhere to go.
+- **In a public repository it refuses to start.** The acceptance criteria it works from are the
+  linked issue, verbatim, and in a public repository anybody with a GitHub account can write an
+  issue; on a comment-triggered run the pull request's title, body and comments reach the prompt as
+  well. `PITCREW_ACCEPTANCE_ALLOW_PUBLIC=true` turns the refusal off. Set it only if the previous
+  sentence describes a risk you accept.
+- **A pull request that starts it by itself must come from a collaborator.** The `review_requested`
+  trigger is already a write-or-triage gesture, and the `/acceptance` comment reads the commenter's
+  association. The third way in - an ordinary `pull_request`, which is how an orchestrator calls this
+  workflow - used to be caught downstream by the runtime's actor check, and on that path the run no
+  longer goes through it. So `acceptance-test.yml` states the rule itself: the pull request's
+  `author_association` must be `OWNER`, `MEMBER` or `COLLABORATOR`.
+
+  Read what that is worth: `author_association` says collaborator, not collaborator-with-write. It
+  keeps an outsider's pull request from starting this agent unattended, which is what the runtime
+  check was doing here. It does not tell a read-only collaborator from a writer, and it is not a
+  boundary against either: a maintainer requesting the reviewer on somebody's pull request runs the
+  agent against that pull request's linked issue, which is the trigger working as designed. The
+  refusal in a public repository above is the line that matters.
+- The two review agents are unaffected by all of that and keep running in public repositories,
+  because the analysis above holds for them: hostile text has nowhere to go.
 
 ## Forks
 
@@ -122,9 +136,43 @@ in a footnote.
 
 - The automatic trigger is `pull_request` on the repository's own branches, and it skips drafts.
 - A comment trigger requires the comment's author association to be `OWNER`, `MEMBER` or
-  `COLLABORATOR`, and the author not to be a bot.
-- Independently of that, the OpenCode runtime refuses to run for an actor without write access to
-  the repository.
+  `COLLABORATOR`, and the author not to be a bot. On that path the OpenCode runtime also refuses to
+  run for an actor without write access to the repository.
+- On `pull_request` there is no check on the actor, and that is a decision rather than an oversight.
+  The runtime's collaborator lookup answers `none` for every GitHub App bot, so a pull request opened
+  by one - `cursor[bot]`, `github-actions[bot]`, whatever opens pull requests in your repository -
+  was never reviewed. What that check was standing in for is still there: a fork gets no secrets from
+  GitHub and is refused by `assert-same-repo.mjs`, so the head branch lives in this repository and
+  somebody with write access pushed it. See
+  [ADR 9](adr/0009-the-pull-request-path-runs-the-cli.md).
+
+  For the two review agents what is given up is not code execution: a user with **read** access can
+  open a pull request from an existing branch and spend model budget. They have no shell, no
+  `webfetch` and no way to read the process environment, so that is the whole of it. **For the
+  acceptance agent it is not**, and that difference is handled where it arises - see "What the
+  acceptance agent may do" above, which is where its own trigger check now lives. If the budget
+  matters in your repository, add the check to your own workflow rather than relying on the
+  runtime's - something like
+
+  ```yaml
+  if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+  ```
+
+  around the job that calls Pitcrew. Note what it also does: a bot's pull request has no such
+  association either, so this is the setting that brings the original problem back on purpose.
+
+## The branch under review configures nothing
+
+`OPENCODE_DISABLE_PROJECT_CONFIG` is set on every step that starts the runtime: both run paths, the
+recovery turn that asks a session for its report, and the transcript read. Without it the runtime reads
+`opencode.json` from the working directory, takes `AGENTS.md` or `CLAUDE.md` as system instructions,
+and imports `.opencode/tool/*.js` - **JavaScript, into its own process**, the one holding the model
+key, for an agent that otherwise has no shell. All three would come from the branch under review.
+
+This was never a boundary against somebody who can push (nothing here is), but it is untrusted text
+and untrusted code arriving through a door nobody had to open. The agent may still read an
+`AGENTS.md` in the checkout as a file if it wants to; it is no longer handed to it as instructions.
+`~/.config/opencode/` is unaffected, which is where the report tool this package installs lives.
 
 ## The comment trigger reads the base branch's configuration
 
@@ -144,12 +192,13 @@ branch can point the provider at a host that collects the key.
 This is listed here rather than under "limitations", because it is the largest piece of trust the
 package asks you to extend.
 
-**The OpenCode runtime is downloaded at run time.** The pinned wrapper action runs
-`curl -fsSL https://opencode.ai/install | bash`, in a process that holds your model key and the
-repository token. The action sets `VERSION`, which the installer honours, so the download is a known
-version rather than whatever is newest. But that is a pinned version, **not a checksum**. The
-download still comes from that host over TLS, and a compromise of it would execute on your runner
-with those secrets present.
+**The OpenCode runtime is downloaded at run time.** `curl -fsSL https://opencode.ai/install | bash`
+runs in a job that holds your model key and the repository token - from a step of
+[`actions/agent/action.yml`](../actions/agent/action.yml) on the `pull_request` path, and from the
+pinned wrapper action on the comment path. Both set `VERSION`, which the installer honours, so the
+download is a known version rather than whatever is newest. But that is a pinned version, **not a
+checksum**. The download still comes from that host over TLS, and a compromise of it would execute on
+your runner with those secrets present.
 
 What pinning does remove is the automatic part: a new OpenCode release cannot arrive in your
 pipeline on its own.
@@ -173,15 +222,18 @@ Out of the runner, to the model provider **you** configured, and nowhere else:
 
 - the pull request's diff - the whole thing on the first run and on `/review`, the new commits on a
   push;
-- the pull request's title, body and comments, which the runtime puts into the prompt;
+- the pull request's title, body and comments, which the runtime puts into the prompt on a
+  comment-triggered run. On `pull_request` it does not: the prompt is what this package put in it;
 - the linked issue, for the acceptance test;
 - whatever files the agent chooses to read from the checkout, including `AGENTS.md` or `CLAUDE.md`;
 - for the acceptance test, what it sees in the browser at your `PITCREW_ACCEPTANCE_TARGET_URL`.
 
 Not out of the runner:
 
-- the session transcript. `share: false` is set on every run, always, so nothing is uploaded to
-  opencode.ai. The transcript is written into the run summary of your own workflow instead.
+- the session transcript. Sharing is refused twice - `"share": "disabled"` in the generated
+  configuration, which both paths read, and `share: 'false'` as an input to the wrapper action - so
+  nothing is uploaded to opencode.ai. The transcript is written into the run summary of your own
+  workflow instead.
 - the model key, the repository token and the credentials of the environment under test, other than
   into the processes that need them. They are kept out of the prompt on purpose: the prompt is
   echoed into the run log, so placeholder substitution uses an allowlist rather than the whole
