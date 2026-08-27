@@ -72,7 +72,9 @@ key. This cannot be a workflow `if:`, because the `issue_comment` payload carrie
 it is `scripts/assert-same-repo.mjs` and it is the first step that touches the API.
 
 **Fetch what the agent asked for.** An agent whose manifest lists `diff` gets `.pitcrew-run/pr.diff`
-from `scripts/fetch-diff.mjs`. One that lists `issue` gets `.pitcrew-run/issue.md` from
+from `scripts/fetch-diff.mjs`, and `.pitcrew-run/changed-files.txt` from the same parse: the paths
+in that diff the agent has to open. Markdown, lockfiles and deletions are left off; everything else
+is on the list. One that lists `issue` gets `.pitcrew-run/issue.md` from
 `scripts/fetch-issue.mjs`. One that lists `target` gets the address of the deployed application, and
 the run stops with an error if none is configured rather than pretending to test something.
 
@@ -100,6 +102,8 @@ sections.
 **Run the agent**, through one of two doors. See "Two ways into the runtime" below.
 
 **Recover the report**, if the agent did not write one. See "A run that reviewed nothing".
+
+**Open the files the agent skipped**, if the diff named any. See "A review that never opened the files".
 
 **Upload the artifact**, if the workflow named one. Under `always()`: a run that went wrong is
 exactly when the video and the logs are worth having.
@@ -238,7 +242,7 @@ that does.** If a run behaves as though no permission applied, check the job log
 
 ## The prompt's placeholders are filled in before the agent sees them
 
-A prompt refers to its inputs by name - `$DIFF_FILE`, `$DIFF_SCOPE`, `$REPORT_FILE` - and
+A prompt refers to its inputs by name - `$DIFF_FILE`, `$DIFF_SCOPE`, `$CHANGED_FILES`, `$REPORT_FILE` - and
 `build-config.mjs` replaces those names with their values before the text is handed over.
 
 It has to. **An agent without a shell cannot resolve an environment variable**, and both review
@@ -253,6 +257,7 @@ The names that get filled in are:
 | --- | --- |
 | `DIFF_FILE` | the diff to review |
 | `DIFF_SCOPE` | one sentence saying which diff it is |
+| `CHANGED_FILES` | the paths from that diff the agent has to open |
 | `ISSUE_FILE` | the issue the pull request closes |
 | `REPORT_FILE` | where the report goes |
 | `RUN_URL` | this workflow run |
@@ -287,8 +292,9 @@ somebody mutes.
 Two defences, one before the model and one after it.
 
 **Before the model:** `scripts/fetch-diff.mjs` hands over the diff of the *new commits* when a push
-triggers the run (`before...after` from the event), not the whole pull request. The checkout still
-holds everything, so context is not lost - only the subject narrows. The whole diff comes back
+triggers the run (`before...after` from the event), not the whole pull request, and the list of
+files to open is taken from that same text. The checkout still holds everything, so context is not
+lost - only the subject narrows. The whole diff comes back
 whenever the incremental one cannot be trusted: a force-push leaves `before` unreachable, a merge of
 the base branch changes nothing under review, and a comment trigger has no `before` at all, which is
 what makes `/review` the way to ask for a full re-read. A diff over a megabyte is cut, with a line
@@ -404,6 +410,38 @@ Deliberately **not** done: writing an empty report file up front. It would turn 
 into a clean pass, which is the one confusion this entire section exists to prevent. The recovery
 turn above once did the same thing by a longer route, which is why it now checks for a session first.
 
+### A review that never opened the files is not a review of the files
+
+A hunk carries three lines of context. Every question the security prompt asks — is the tenant
+condition still on that query, does this route still authenticate, where does this value come from —
+is a question about the file, not about the hunk. Asking the model to be curious is not a floor:
+one run read the whole diff, opened seven of twenty-nine changed files, claimed it had confirmed
+things it never grepped for, and published `verdict: pass`.
+
+Two halves, and either one alone leaves the hole open.
+
+**Before the model:** `fetch-diff.mjs` writes the paths from that same diff to
+`.pitcrew-run/changed-files.txt` and the prompt names `$CHANGED_FILES`. The list is decided by
+exemption, not by an allow-list of "source" extensions — an allow-list silently drops the first file
+in a language nobody thought of. Exempt: `.md`, `.mdx`, `.txt`, lockfiles, and files the diff
+deletes. On an incremental push the list is the files in *that* diff, so the coverage claim matches
+the scope claim next to it.
+
+**After the model:** `ensure-coverage.mjs` walks the session the same way the transcript does, and
+compares the paths a `read` actually opened against that list. A relative path, an absolute path and
+a read through a symlink count as the same file. A shortfall gets one extra turn on the same session
+— open the missing files, write the report again — and the second report is the one that gets
+published. The number goes on the comment either way: `Scope: the whole pull request · 7 of 29
+changed files opened`. That number used to exist only in the raw job log, which is why a shallow run
+and a thorough one looked identical on the pull request.
+
+An unreadable export is a `::warning::` and no number, never a silent `N of N`. Inventing full
+coverage from a transcript we could not read would put the hole back.
+
+`PITCREW_REQUIRE_FULL_COVERAGE=false` is what keeps a shortfall that survives the extra turn green.
+Default is on: a pass built only on hunks is not evidence that the files were reviewed. The comment
+still names the unread files either way. Publishing still comes first.
+
 ## The summary comment and its fixed frame
 
 Every run leaves one comment on the pull request, and the script writes its frame:
@@ -417,7 +455,7 @@ The report goes up before the exit code, so a red check never hides it.
 
 **Quality gate: ❌ failed** — 1 finding in this run at or above `high`.
 
-Scope: the 4353741..7e30841 push · [Workflow run](…)
+Scope: the 4353741..7e30841 push · 7 of 29 changed files opened · [Workflow run](…)
 ```
 
 Heading, verdict, counts, gate line and links come from the report's structured fields, so the shape
@@ -628,7 +666,7 @@ history costs strictness, refusing to publish would cost the report.
 | | |
 | --- | --- |
 | 0 | the gate holds |
-| 1 | findings at or above the threshold - this run's, or earlier ones still open |
+| 1 | findings at or above the threshold, or a coverage shortfall (unless `PITCREW_REQUIRE_FULL_COVERAGE=false`) |
 | 2 | no usable report: nothing was reviewed |
 | 3 | there was a report and it could not be published |
 
@@ -639,6 +677,9 @@ quietly on anybody's behalf. The verdict and the table are on the pull request; 
 
 `PITCREW_FAIL_ON_NO_REPORT=false` keeps a run whose agent produced nothing green, for a repository
 that would rather have the check than the review.
+
+`PITCREW_REQUIRE_FULL_COVERAGE=false` keeps a run whose agent skipped changed files green, for a
+repository that would rather have the check than the floor. The number is on the comment either way.
 
 ## Starting the acceptance test
 

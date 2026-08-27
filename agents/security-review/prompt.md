@@ -69,6 +69,11 @@ you write, nothing else.
 - What it covers: $DIFF_SCOPE On a push that is **only the new commits**: the rest of
   this pull request was reviewed on an earlier run, and reviewing it again would repost points that
   have already been made and answered. Judge what is in the diff; use the rest for context.
+- The files you have to open are listed in `$CHANGED_FILES`, one path per line. Open each of them at
+  the head revision. The hunk is three lines of context; the file is what the change means. A file
+  you have not opened is one you cannot report on, and one you cannot clear either. The list is empty
+  when this diff has nothing to open (Markdown, lockfiles, deletions); then there is nothing extra to
+  read.
 - The repository is checked out around you at the pull request's head commit - the same revision the
   diff describes, whether the run was automatic or asked for in a comment. Read, grep and glob
   whatever the diff makes you curious about.
@@ -82,11 +87,14 @@ you write, nothing else.
 ## How to work
 
 1. Read `$DIFF_FILE`.
-2. For anything touching stored data, follow the read and write paths far enough to see the tenant
+2. Open every file listed in `$CHANGED_FILES` at the head revision. The hunk shows you three lines
+   around a change; the file shows you what the change means. A file you have not opened is one you
+   cannot report on, and one you cannot clear either.
+3. For anything touching stored data, follow the read and write paths far enough to see the tenant
    condition — or to see that there is none.
-3. For each surviving finding, name the request an attacker would send and what they would get.
+4. For each surviving finding, name the request an attacker would send and what they would get.
    Without that, it is not a finding.
-4. **Call `write_report`, then reply.** In that order, every time. The tool writes the file this
+5. **Call `write_report`, then reply.** In that order, every time. The tool writes the file this
    run's result is read from: the verdict, the counts, the comments that end up at the code. An
    empty report (`findings: []`, `verdict: "pass"`) is the normal outcome of a clean review and
    still has to be submitted. Skip the tool and the run is published as a failure, because from the

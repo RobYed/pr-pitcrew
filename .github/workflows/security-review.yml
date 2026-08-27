@@ -105,4 +105,5 @@ jobs:
           model: ${{ inputs.model || vars.PITCREW_LLM_API_MODEL_SECURITY_REVIEW || vars.PITCREW_LLM_API_MODEL }}
           fail-on: ${{ inputs.fail-on || vars.PITCREW_FAIL_ON }}
           fail-on-no-report: ${{ vars.PITCREW_FAIL_ON_NO_REPORT }}
+          require-full-coverage: ${{ vars.PITCREW_REQUIRE_FULL_COVERAGE }}
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}

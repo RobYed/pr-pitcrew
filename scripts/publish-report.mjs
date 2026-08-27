@@ -37,7 +37,8 @@
  *
  * Environment: GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, REVIEW_TITLE,
  * optionally REPORT_FILE, RUN_URL, ARTIFACT_NAME, ARTIFACT_LABEL, DRY_RUN,
- * PITCREW_FAIL_ON, PITCREW_FAIL_ON_NO_REPORT.
+ * PITCREW_FAIL_ON, PITCREW_FAIL_ON_NO_REPORT, PITCREW_REQUIRE_FULL_COVERAGE,
+ * COVERAGE_FILE.
  */
 
 import { appendFileSync, readFileSync, existsSync } from 'node:fs';
@@ -51,6 +52,7 @@ import {
   pickSummaryTarget,
   summaryMarker,
 } from './review-comments.mjs';
+import { applyCoverageGate, coverageCaption, parseCoverageFile, unreadLine } from './coverage.mjs';
 
 const token = process.env.GITHUB_TOKEN;
 const repository = process.env.GITHUB_REPOSITORY;
@@ -168,6 +170,22 @@ const failOn = (() => {
  * sentence - so nobody has to guess which happened.
  */
 const failOnNoReport = (process.env.PITCREW_FAIL_ON_NO_REPORT ?? 'true').trim().toLowerCase() !== 'false';
+
+/**
+ * Whether a measured shortfall — files the agent was handed and did not open —
+ * fails the check.
+ *
+ * Yes by default, in the same shape as `PITCREW_FAIL_ON_NO_REPORT`: a pass
+ * built only on hunks is not evidence that the files were reviewed, and
+ * reading that as "no findings" makes the gate blind in exactly the case this
+ * floor exists for. `false` keeps the number on the comment and the check
+ * green, for a repository that would rather have the check than the floor.
+ */
+const requireFullCoverage = (process.env.PITCREW_REQUIRE_FULL_COVERAGE ?? 'true').trim().toLowerCase() !== 'false';
+
+const coverageFile =
+  (process.env.COVERAGE_FILE ?? '').trim() || join(process.env.GITHUB_WORKSPACE ?? '.', '.pitcrew-run', 'coverage.json');
+const coverage = parseCoverageFile(coverageFile);
 
 /**
  * A severity as a number. An absent or unrecognised one counts as `medium`,
@@ -587,8 +605,16 @@ function summaryComment(report, scope, agentText, artifactUrl, gate) {
     if (gate.standing.length > 0) lines.push(...standingList(gate), '');
   }
 
+  // Named on the comment even when the gate stays green: that is what makes a
+  // shallow run and a thorough one look different. When the gate already
+  // failed for coverage, the reason named the files and repeating them is
+  // noise.
+  const unread = unreadLine(coverage);
+  if (unread && gate?.kind !== 'coverage') lines.push(unread, '');
+
   const trailer = [
     scope && `Scope: ${scope}`,
+    coverageCaption(coverage),
     runUrl && `[Workflow run](${runUrl})`,
     artifactUrl && `[${artifactLabel}](${artifactUrl})`,
   ].filter(Boolean);
@@ -889,6 +915,13 @@ function writeSummary(report, gate) {
     if (gate.standing.length > 0) lines.push(...standingList(gate), '');
   }
 
+  const caption = coverageCaption(coverage);
+  if (caption) {
+    lines.push(`Coverage: ${caption}`, '');
+    const unread = unreadLine(coverage);
+    if (unread) lines.push(unread, '');
+  }
+
   if (report.summary) lines.push(report.summary, '');
 
   const table = criteriaTable(report);
@@ -917,7 +950,7 @@ const report = readReport();
 const carriedOver =
   Number.isFinite(THRESHOLD[failOn]) && token && repository && prNumber && !dryRun ? await unresolvedFindings() : [];
 
-const gate = evaluateGate(report, carriedOver);
+const gate = applyCoverageGate(evaluateGate(report, carriedOver), coverage, requireFullCoverage);
 
 if (report.missing || report.invalid) {
   summary(

@@ -338,6 +338,7 @@ describe('fillPrompt', () => {
 
   it('defaults its allowlist to the placeholders the package documents', () => {
     assert.equal(PLACEHOLDERS.includes('DIFF_FILE'), true);
+    assert.equal(PLACEHOLDERS.includes('CHANGED_FILES'), true);
     assert.equal(PLACEHOLDERS.includes('PITCREW_LLM_API_KEY'), false);
     assert.equal(PLACEHOLDERS.includes('GITHUB_TOKEN'), false);
   });

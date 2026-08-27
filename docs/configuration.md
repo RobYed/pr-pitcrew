@@ -28,6 +28,7 @@ Settings → Secrets and variables → Actions → Variables.
 | `PITCREW_LLM_API_MODEL_ACCEPTANCE_TEST` | acceptance test | no | `PITCREW_LLM_API_MODEL` | Model for that one agent. Reading a diff and driving a browser for half an hour are different jobs. |
 | `PITCREW_FAIL_ON` | bug and security review | no | `high` | Severity from which findings fail the check: `high`, `medium`, `low`, or `never` to keep the agent advisory. Anything else is refused with a warning and `high` is used. |
 | `PITCREW_FAIL_ON_NO_REPORT` | bug and security review | no | `true` | `false` lets a run whose agent produced no usable report stay green. The default fails it, because a diff nobody reviewed is not a diff nobody found anything in. |
+| `PITCREW_REQUIRE_FULL_COVERAGE` | bug and security review | no | `true` | `false` lets a run whose agent skipped changed files stay green. The default fails it, because a pass built only on hunks is not evidence that the files were reviewed. The comment names the shortfall either way — `Scope: … · 7 of 29 changed files opened`. Markdown, lockfiles and deletions are not on the list, so a docs-only diff cannot go red for this. |
 | `PITCREW_OUTPUT_LANGUAGE` | all | no | `English` | The language the agent writes its own text in - the summary sentence, finding bodies, criteria evidence. The frame around that text is English on every run, which is why English is the default. |
 | `PITCREW_APP_ID` | all | no | none | Id of a GitHub App. When set, comments carry that app's name and avatar instead of `github-actions[bot]`. Needs `PITCREW_APP_PRIVATE_KEY` as well. |
 | `PITCREW_ACCEPTANCE_TARGET_URL` | acceptance test | yes for that agent | none | The deployed application the agent drives. Without it the run stops with an error rather than pretending to test something. |
@@ -169,6 +170,7 @@ in the workspace that has kept its credentials and was made with `fetch-depth: 0
 | `app-private-key` | no | `''` | Private key belonging to `app-id`. |
 | `fail-on` | no | `''` (means `high`) | Severity from which findings fail the check. |
 | `fail-on-no-report` | no | `''` (means `true`) | `false` lets a run without a usable report stay green. |
+| `require-full-coverage` | no | `''` (means `true`) | `false` lets a run whose agent skipped changed files stay green. |
 | `target-url` | no | `''` | The deployed application an agent with a browser should drive. Required when the agent's manifest lists the `target` input. |
 | `target-username` | no | `''` | Account for the application under test. |
 | `target-password` | no | `''` | Password for it. |
@@ -205,6 +207,7 @@ Prompts refer to them by these names; nothing else is filled in.
 | --- | --- |
 | `DIFF_FILE` | `.pitcrew-run/pr.diff`, present when the manifest lists the `diff` input |
 | `DIFF_SCOPE` | one sentence saying which diff it is: the new commits, or the whole pull request |
+| `CHANGED_FILES` | `.pitcrew-run/changed-files.txt`, the paths from that same diff the agent has to open. Empty when the diff is Markdown, lockfiles or deletions only |
 | `ISSUE_FILE` | `.pitcrew-run/issue.md`, present when the manifest lists the `issue` input. Empty when the pull request closes no issue |
 | `REPORT_FILE` | `.pitcrew-run/report.json` |
 | `WORK_DIR` | `.pitcrew-run/scenario` - scratch space, git-ignored |
@@ -223,11 +226,12 @@ Useful when working on the package rather than using it. See [../CONTRIBUTING.md
 | | |
 | --- | --- |
 | `DRY_RUN=1` | `publish-report.mjs` prints what it would post and touches no API |
-| `SESSION_EXPORT=<file>` | `publish-transcript.mjs` and `ensure-report.mjs` read that file instead of calling the OpenCode CLI. In this mode the transcript prints to stdout and never writes to the run summary, even inside a job |
+| `SESSION_EXPORT=<file>` | `publish-transcript.mjs`, `ensure-report.mjs` and `ensure-coverage.mjs` read that file instead of calling the OpenCode CLI. In this mode the transcript prints to stdout and never writes to the run summary, even inside a job |
 | `TRANSCRIPT_TITLE` | the heading of the transcript section |
 | `TRANSCRIPT_REDACT` | extra environment variable names whose values are replaced by `[redacted]`. Names containing `KEY`, `TOKEN`, `SECRET`, `PASSWORD` or `CREDENTIAL` are recognised without this |
 | `OPENCODE_BIN` | path to the OpenCode binary, when it is not on the PATH |
 | `ENSURE_REPORT_CONTINUE=0` | skips the one extra turn that asks the agent for `write_report` |
+| `ENSURE_COVERAGE_CONTINUE=0` | skips the one extra turn that asks the agent to open the files it skipped |
 | `REVIEW_TITLE`, `REPORT_KIND` | what `publish-report.mjs` would otherwise get from the agent manifest |
 
 ## Running the package's own checks
