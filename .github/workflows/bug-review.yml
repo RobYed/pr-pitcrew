@@ -77,6 +77,10 @@ jobs:
       # write, not read: the runtime marks the trigger with a reaction, and
       # reactions on a pull request are governed by the issues permission.
       issues: write
+      # The next push looks up this agent's check on the last commit. It must
+      # see if that check published a report. Without this, a cancelled review
+      # is skipped.
+      checks: read
 
     steps:
       # No `persist-credentials: false` here, on purpose. On a comment-triggered

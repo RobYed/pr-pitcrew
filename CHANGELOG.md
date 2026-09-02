@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cancelled review is no longer treated as done.** The next push reviews from the last
+  published report of this agent, not from the last push. A cancelled, timed-out or missing check,
+  and a failure with no report, do not count. Callers need `checks: read`. If the lookup fails, the
+  whole pull request is reviewed.
+
 ## [1.1.0] - 2026-08-27
 
 ### Added

@@ -8,15 +8,21 @@
  * word an old objection slightly differently, so it reads as a new finding.
  * A pull request then never converges: fix, review, fix, review.
  *
- * So a push is reviewed as what it is - the commits since the last review
- * (`before...after` from the event) - while the checkout still holds the whole
- * pull request for context. `publish-report.mjs` drops anything that lands on
- * a line somebody has already commented on, as the second line of defence.
+ * So a push is reviewed as the commits since the last *published* review of
+ * this agent on this pull request, while the checkout still holds the whole
+ * pull request for context. `github.event.before` is the last push, not the
+ * last complete review. A new push cancels the run that is not complete, and
+ * that cancelled check sits on the old commit. If the new run used `before`
+ * as the start of the range, the cancelled commits would never be reviewed.
+ * The walk below starts at `before` and moves to the newest parent that
+ * published a report. `publish-report.mjs` drops anything that lands on a
+ * line somebody has already commented on, as the second line of defence.
  *
  * Falls back to the full diff whenever the incremental one cannot be trusted:
- * a force-push leaves `before` unreachable, and a comment trigger has no
- * `before` at all - `/review` is how a human asks for the whole pull request
- * to be looked at again.
+ * a force-push leaves `before` unreachable, a comment trigger has no `before`
+ * at all, the walk finds no published review, and a failed lookup must not
+ * guess. `/review` is how a human asks for the whole pull request to be
+ * looked at again.
  *
  * The same parse that writes the diff also writes the list of paths the agent
  * has to open. The hunk is three lines of context; the file is what the change
@@ -38,6 +44,7 @@ const token = process.env.GITHUB_TOKEN;
 // that says it was shortened.
 const LIMIT = 1024 * 1024;
 const EMPTY_SHA = '0000000000000000000000000000000000000000';
+const MAX_WALK = 100;
 
 async function diff(path) {
   const response = await fetch(`${api}${path}`, {
@@ -51,6 +58,181 @@ async function diff(path) {
   return await response.text();
 }
 
+async function jsonGet(path) {
+  const response = await fetch(`${api}${path}`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+      accept: 'application/vnd.github+json',
+      'x-github-api-version': '2022-11-28',
+      'user-agent': 'pr-pitcrew-fetch-diff',
+    },
+  });
+  if (!response.ok) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+/** True when `name` is this agent's check, with or without a caller prefix. */
+export function matchesAgentCheck(name, checkName) {
+  const n = String(name ?? '');
+  const c = String(checkName ?? '');
+  if (!n || !c) return false;
+  return n === c || n.endsWith(` / ${c}`);
+}
+
+/** The newest check of this agent in a list. None if this agent did not run. */
+export function pickAgentCheck(checkRuns, checkName) {
+  const matches = (checkRuns ?? []).filter(run => matchesAgentCheck(run.name, checkName));
+  if (matches.length === 0) return null;
+  return (
+    [...matches].sort(
+      (a, b) => String(b.completed_at ?? '').localeCompare(String(a.completed_at ?? '')) || Number(b.id) - Number(a.id),
+    )[0] ?? null
+  );
+}
+
+/**
+ * Whether this check published a review of the commit.
+ *
+ * `success` did. `cancelled`, `timed_out` and a missing check did not. A
+ * `failure` did only when it was a gate failure after a report, not when the
+ * agent left no report (exit 2). The annotations carry that difference: the
+ * no-report path writes "this diff was not reviewed" and exits 2. A run that
+ * wrote the summary frame for a real report does not.
+ */
+export function checkPublishedReport(check, annotations = []) {
+  if (!check) return false;
+  if (check.conclusion === 'success') return true;
+  if (check.conclusion !== 'failure') return false;
+
+  const text = (annotations ?? []).map(entry => String(entry?.message ?? '')).join('\n');
+  if (/\bexit code 2\b/i.test(text) || /this diff was not reviewed/i.test(text) || /left no report/i.test(text)) {
+    return false;
+  }
+  return /Quality gate failed/i.test(text) || /\bexit code 1\b/i.test(text);
+}
+
+/**
+ * Walk from `before` back through the pull request until a published review.
+ *
+ * `commitsOldestFirst` is the pull request's commits. `statusOf(sha)` answers
+ * `published`, `unpublished` or `failed`. A failed lookup stops the walk: the
+ * caller must not use `before...after`.
+ */
+export async function walkToPublishedReview(before, commitsOldestFirst, statusOf) {
+  if (!before) return { base: null, reason: 'none' };
+
+  const history = [before];
+  const index = (commitsOldestFirst ?? []).indexOf(before);
+  if (index > 0) {
+    for (let i = index - 1; i >= 0 && history.length < MAX_WALK; i--) {
+      history.push(commitsOldestFirst[i]);
+    }
+  }
+
+  for (const sha of history) {
+    const status = await statusOf(sha);
+    if (status === 'failed') return { base: null, reason: 'lookup-failed' };
+    if (status === 'published') {
+      return { base: sha, reason: sha === before ? 'last-push' : 'ancestor' };
+    }
+  }
+  return { base: null, reason: 'none' };
+}
+
+function incrementalScope(from, to) {
+  return `the ${from.slice(0, 7)}..${to.slice(0, 7)} push - the commits added since the last review. Earlier commits in this pull request have already been reviewed.`;
+}
+
+async function listCheckRuns(sha) {
+  const runs = [];
+  for (let page = 1; page <= 10; page++) {
+    const body = await jsonGet(`/repos/${repository}/commits/${sha}/check-runs?per_page=100&page=${page}&filter=latest`);
+    if (body === null) return null;
+    const batch = body.check_runs ?? [];
+    runs.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return runs;
+}
+
+async function listAnnotations(checkRunId) {
+  const body = await jsonGet(`/repos/${repository}/check-runs/${checkRunId}/annotations?per_page=100`);
+  if (body === null) return null;
+  return Array.isArray(body) ? body : [];
+}
+
+async function listPullCommits() {
+  const commits = [];
+  for (let page = 1; page <= 10; page++) {
+    const body = await jsonGet(`/repos/${repository}/pulls/${prNumber}/commits?per_page=100&page=${page}`);
+    if (body === null || !Array.isArray(body)) return null;
+    commits.push(...body.map(entry => entry.sha));
+    if (body.length < 100) break;
+  }
+  return commits;
+}
+
+async function statusOfCommit(sha, checkName) {
+  const runs = await listCheckRuns(sha);
+  if (runs === null) return 'failed';
+  const check = pickAgentCheck(runs, checkName);
+  if (!check) return 'unpublished';
+  if (check.conclusion === 'success') return 'published';
+  if (check.conclusion !== 'failure') return 'unpublished';
+  const annotations = await listAnnotations(check.id);
+  if (annotations === null) return 'failed';
+  return checkPublishedReport(check, annotations) ? 'published' : 'unpublished';
+}
+
+/**
+ * The SHA that the incremental diff should start from, or null for the whole
+ * pull request. Null also covers a lookup that failed: `before...after` is
+ * then the wrong guess.
+ */
+async function resolveCompareBase(before, checkName) {
+  if (!checkName) {
+    console.log('CHECK_NAME is not set; reviewing the whole pull request.');
+    return null;
+  }
+
+  const first = await statusOfCommit(before, checkName);
+  if (first === 'failed') {
+    console.log(`Could not look up this agent's check on ${before.slice(0, 7)}; reviewing the whole pull request.`);
+    return null;
+  }
+  if (first === 'published') return before;
+
+  const commits = await listPullCommits();
+  if (commits === null) {
+    console.log('Could not list the commits of this pull request; reviewing the whole pull request.');
+    return null;
+  }
+
+  const cache = new Map([[before, first]]);
+  const result = await walkToPublishedReview(before, commits, async sha => {
+    if (cache.has(sha)) return cache.get(sha);
+    const status = await statusOfCommit(sha, checkName);
+    cache.set(sha, status);
+    return status;
+  });
+
+  if (result.reason === 'lookup-failed') {
+    console.log("Could not look up this agent's earlier checks; reviewing the whole pull request.");
+    return null;
+  }
+  if (!result.base) {
+    console.log('No published review of this agent on this pull request; reviewing the whole pull request.');
+    return null;
+  }
+
+  console.log(`The check on ${before.slice(0, 7)} did not publish a report; reviewing from ${result.base.slice(0, 7)}.`);
+  return result.base;
+}
+
 async function main() {
   if (!repository || !prNumber || !diffFile || !token) {
     console.error('::error::fetch-diff.mjs needs GITHUB_REPOSITORY, PR_NUMBER, DIFF_FILE and GITHUB_TOKEN.');
@@ -59,22 +241,26 @@ async function main() {
 
   const before = process.env.BEFORE_SHA || '';
   const after = process.env.AFTER_SHA || '';
+  const checkName = (process.env.CHECK_NAME ?? '').trim();
 
   let text = null;
   let scope = '';
 
   if (before && after && before !== after && before !== EMPTY_SHA) {
-    text = await diff(`/repos/${repository}/compare/${before}...${after}`);
-    if (text === null) {
-      // Force-pushed, or the commit was garbage collected: `before` no longer
-      // describes anything this repository can reach.
-      console.log(`No comparison between ${before.slice(0, 7)} and ${after.slice(0, 7)}; reviewing the whole pull request.`);
-    } else if (text.trim() === '') {
-      // A merge of the base branch, or a push that changed nothing under review.
-      console.log('The new commits change no files; reviewing the whole pull request.');
-      text = null;
-    } else {
-      scope = `the ${before.slice(0, 7)}..${after.slice(0, 7)} push - the commits added since the last review. Earlier commits in this pull request have already been reviewed.`;
+    const base = await resolveCompareBase(before, checkName);
+    if (base) {
+      text = await diff(`/repos/${repository}/compare/${base}...${after}`);
+      if (text === null) {
+        // Force-pushed, or the commit was garbage collected: `before` no longer
+        // describes anything this repository can reach.
+        console.log(`No comparison between ${base.slice(0, 7)} and ${after.slice(0, 7)}; reviewing the whole pull request.`);
+      } else if (text.trim() === '') {
+        // A merge of the base branch, or a push that changed nothing under review.
+        console.log('The new commits change no files; reviewing the whole pull request.');
+        text = null;
+      } else {
+        scope = incrementalScope(base, after);
+      }
     }
   }
 

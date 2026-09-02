@@ -256,7 +256,7 @@ The names that get filled in are:
 | | |
 | --- | --- |
 | `DIFF_FILE` | the diff to review |
-| `DIFF_SCOPE` | one sentence saying which diff it is |
+| `DIFF_SCOPE` | one sentence saying which diff it is: since the last published review, or the whole pull request |
 | `CHANGED_FILES` | the paths from that diff the agent has to open |
 | `ISSUE_FILE` | the issue the pull request closes |
 | `REPORT_FILE` | where the report goes |
@@ -291,15 +291,20 @@ somebody mutes.
 
 Two defences, one before the model and one after it.
 
-**Before the model:** `scripts/fetch-diff.mjs` hands over the diff of the *new commits* when a push
-triggers the run (`before...after` from the event), not the whole pull request, and the list of
-files to open is taken from that same text. The checkout still holds everything, so context is not
-lost - only the subject narrows. The whole diff comes back
-whenever the incremental one cannot be trusted: a force-push leaves `before` unreachable, a merge of
-the base branch changes nothing under review, and a comment trigger has no `before` at all, which is
-what makes `/review` the way to ask for a full re-read. A diff over a megabyte is cut, with a line
-saying so, because a diff that does not fit the context window is worse than a shortened one that
-admits it.
+**Before the model:** `scripts/fetch-diff.mjs` hands over the diff of the commits since the last
+*published* review of this agent when a push triggers the run, not the whole pull request, and the
+list of files to open is taken from that same text. `github.event.before` is the last push, not the
+last complete review. A new push cancels the run that is not complete (`cancel-in-progress: true`).
+The new run looks up this agent's check on `before`. If that check published a report, the range is
+`before...after`. If it did not — cancelled, timed out, missing, or a failure with no report — the
+script walks to the newest parent that did publish, and compares that commit to `after`. If there is
+no such commit, or the lookup fails, the whole pull request is the subject. The checkout still holds
+everything, so context is not lost - only the subject narrows. The whole diff also comes back when
+the incremental one cannot be trusted for the older reasons: a force-push leaves `before`
+unreachable, a merge of the base branch changes nothing under review, and a comment trigger has no
+`before` at all, which is what makes `/review` the way to ask for a full re-read. A diff over a
+megabyte is cut, with a line saying so, because a diff that does not fit the context window is worse
+than a shortened one that admits it.
 
 **After the model:** `scripts/publish-report.mjs` drops a finding when one of its own earlier
 comments already made the same point in the same place. Three conditions have to hold together:
@@ -759,6 +764,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  checks: read
 
 jobs:
   ci:

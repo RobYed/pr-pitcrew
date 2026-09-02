@@ -195,6 +195,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      checks: read
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -216,7 +217,7 @@ jobs:
           output-language: ${{ inputs.output-language || vars.PITCREW_OUTPUT_LANGUAGE || 'English' }}
 ```
 
-Four details that are not decoration:
+These details are not decoration:
 
 - **No `persist-credentials: false` on the checkout.** OpenCode fetches the pull request branch
   itself and installs no credentials of its own; in a private repository that fetch needs the ones
@@ -225,6 +226,8 @@ Four details that are not decoration:
   branch.
 - **`issues: write`**, not `read`. The runtime marks the trigger with a reaction, and reactions on a
   pull request are governed by the issues permission.
+- **`checks: read`.** The next push looks up this agent's check on the last commit. It must see if
+  that check published a report. Without this, a cancelled review is skipped.
 - **The `uses:` ref is `@main` on the default branch.** `scripts/release.mjs` rewrites it to the tag
   on a release commit, and `--verify` fails CI if a workflow on `main` says anything else. A relative
   `./actions/agent` would resolve against the *caller's* workspace, which is why the reference is
@@ -252,6 +255,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  checks: read
 
 concurrency:
   group: legal-review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'push' }}

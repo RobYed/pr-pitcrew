@@ -260,6 +260,10 @@ runs:
         # request the subject when a human asks for a review by comment.
         BEFORE_SHA: ${{ github.event.before }}
         AFTER_SHA: ${{ github.event.after }}
+        # The job name of this agent. A caller prefix is allowed. The script
+        # uses it to find the last published review of this agent, not of a
+        # sibling.
+        CHECK_NAME: ${{ steps.manifest.outputs.check }}
       run: node "$PITCREW_HOME/scripts/fetch-diff.mjs"
 
     # The agent gets the issue as a file rather than fetching it. `gh` is not in

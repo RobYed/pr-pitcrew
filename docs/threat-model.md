@@ -239,8 +239,8 @@ the same process, but it is the environment those secrets live in for that job.
 
 Out of the runner, to the model provider **you** configured, and nowhere else:
 
-- the pull request's diff - the whole thing on the first run and on `/review`, the new commits on a
-  push;
+- the pull request's diff - the whole thing on the first run and on `/review`, the commits since the
+  last published review on a push;
 - the pull request's title, body and comments, which the runtime puts into the prompt on a
   comment-triggered run. On `pull_request` it does not: the prompt is what this package put in it;
 - the linked issue, for the acceptance test;

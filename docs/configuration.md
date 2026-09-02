@@ -111,9 +111,10 @@ not a bot.
 Check name: `Pitcrew / Bug Review`, `Pitcrew / Security Review`. Called, each gains the caller's job
 id in front.
 
-Job permissions: `contents: read`, `pull-requests: write`, `issues: write`. The last is `write`
-rather than `read` because the runtime marks the trigger with a reaction, and reactions on a pull
-request are governed by the issues permission.
+Job permissions: `contents: read`, `pull-requests: write`, `issues: write`, `checks: read`. The last
+is so the next push can see if this agent's check on the previous commit published a report. Without
+it, a cancelled review is skipped. `issues: write` rather than `read` because the runtime marks the
+trigger with a reaction, and reactions on a pull request are governed by the issues permission.
 
 ### `acceptance-test.yml`
 
@@ -207,7 +208,7 @@ Prompts refer to them by these names; nothing else is filled in.
 | | |
 | --- | --- |
 | `DIFF_FILE` | `.pitcrew-run/pr.diff`, present when the manifest lists the `diff` input |
-| `DIFF_SCOPE` | one sentence saying which diff it is: the new commits, or the whole pull request |
+| `DIFF_SCOPE` | one sentence saying which diff it is: the commits since the last published review, or the whole pull request |
 | `CHANGED_FILES` | `.pitcrew-run/changed-files.txt`, the paths from that same diff the agent has to open. Empty when the diff is Markdown, lockfiles or deletions only |
 | `ISSUE_FILE` | `.pitcrew-run/issue.md`, present when the manifest lists the `issue` input. Empty when the pull request closes no issue |
 | `REPORT_FILE` | `.pitcrew-run/report.json` |

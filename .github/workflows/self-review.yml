@@ -23,6 +23,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  checks: read
 
 concurrency:
   group: self-review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'push' }}
