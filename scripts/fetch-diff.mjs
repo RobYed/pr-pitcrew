@@ -98,10 +98,11 @@ export function pickAgentCheck(checkRuns, checkName) {
  * Whether this check published a review of the commit.
  *
  * `success` did. `cancelled`, `timed_out` and a missing check did not. A
- * `failure` did only when it was a gate failure after a report, not when the
- * agent left no report (exit 2). The annotations carry that difference: the
- * no-report path writes "this diff was not reviewed" and exits 2. A run that
- * wrote the summary frame for a real report does not.
+ * `failure` did only when the gate ran after a report: `publish-report.mjs`
+ * writes "Quality gate failed" *after* it posts. A bare `exit code 1` is not
+ * enough. Any failed step gets that annotation, including a crash before a
+ * report exists. The no-report path also writes "Quality gate failed", then
+ * "this diff was not reviewed" and exit 2; that is not a review.
  */
 export function checkPublishedReport(check, annotations = []) {
   if (!check) return false;
@@ -112,7 +113,7 @@ export function checkPublishedReport(check, annotations = []) {
   if (/\bexit code 2\b/i.test(text) || /this diff was not reviewed/i.test(text) || /left no report/i.test(text)) {
     return false;
   }
-  return /Quality gate failed/i.test(text) || /\bexit code 1\b/i.test(text);
+  return /Quality gate failed/i.test(text);
 }
 
 /**

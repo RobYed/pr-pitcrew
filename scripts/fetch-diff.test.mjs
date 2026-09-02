@@ -83,13 +83,21 @@ describe('checkPublishedReport', () => {
     assert.equal(checkPublishedReport(null), false);
   });
 
-  it('counts a gate failure (exit 1) as published', () => {
+  it('counts a gate failure as published', () => {
     assert.equal(
       checkPublishedReport({ conclusion: 'failure' }, [
         { message: 'Quality gate failed. 1 finding in this run at or above `high`.' },
         { message: 'Process completed with exit code 1.' },
       ]),
       true,
+    );
+  });
+
+  it('does not count a bare exit code 1 as published', () => {
+    // Any failed step gets this annotation, including a crash before a report.
+    assert.equal(
+      checkPublishedReport({ conclusion: 'failure' }, [{ message: 'Process completed with exit code 1.' }]),
+      false,
     );
   });
 
