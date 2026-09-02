@@ -29,10 +29,10 @@ On a private repository those minutes are billed. On a public one they are not.
 
 What drives the number, in order:
 
-1. **The diff.** On a push the agents are given the *new commits*, not the whole pull request, which
-   is the single largest saving in the package, and it exists for a different reason (see
-   [`how-it-works.md`](how-it-works.md), "Reviewing the same pull request twice"). A `/review`
-   comment deliberately re-reads everything.
+1. **The diff.** On a push the agents are given the commits since the last published review, not the
+   whole pull request, which is the single largest saving in the package, and it exists for a
+   different reason (see [`how-it-works.md`](how-it-works.md), "Reviewing the same pull request
+   twice"). A `/review` comment deliberately re-reads everything.
 2. **The files the agent decides to read.** A review agent reads around the diff to check whether a
    suspicion is real. That is most of its input on a small diff, and it is not bounded.
 3. **`AGENTS.md` / `CLAUDE.md` and what they point at.** The prompts send the review agents to the

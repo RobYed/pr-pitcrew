@@ -76,6 +76,13 @@ describe('the agents this package ships', () => {
         const workflow = readFileSync(file, 'utf8');
         assert.ok(workflow.includes(`agent: ${id}`), 'the workflow does not pass this agent id');
         assert.ok(workflow.includes(`name: ${manifest.check}`), `the job name is not "${manifest.check}"`);
+        if (manifest.inputs?.includes('diff')) {
+          assert.match(
+            workflow,
+            /checks:\s*read/,
+            'a cancelled review cannot be looked up without checks: read',
+          );
+        }
         if (manifest.command) {
           assert.ok(
             workflow.includes(`'${manifest.command}'`),
@@ -180,6 +187,12 @@ describe('the agent action', () => {
 
   it('names the agent on the CLI rather than trusting a fallback', () => {
     assert.match(cli, /--agent/);
+  });
+
+  it('hands fetch-diff the agent check name, so a caller prefix still matches', () => {
+    const fetch = steps.find(step => step.includes('fetch-diff.mjs'));
+    assert.ok(fetch, 'no step invokes fetch-diff.mjs');
+    assert.match(fetch, /CHECK_NAME: \$\{\{ steps\.manifest\.outputs\.check \}\}/);
   });
 
   it('keeps the repository token out of the process that reads the diff', () => {

@@ -43,7 +43,8 @@ Minutes later the diff carries comments where the defects are, and one summary c
 verdict, counts by severity, what was looked at. From `high` upward (configurable) the check is red, and it stays
 red until somebody deals with the finding.
 
-**You push again.** Only the commits you added are reviewed, and a point one of the agents already
+**You push again.** Only the commits since the last published review are reviewed. A cancelled
+run is not treated as done: the next push includes those commits. A point one of the agents already
 made is not made a second time. What you fixed disappears; what you did not stays red.
 
 **You ask for the acceptance test.** You request a review from the pitcrew account, which is the
@@ -75,6 +76,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  checks: read
 
 concurrency:
   group: bug-review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event.comment.id || 'push' }}
