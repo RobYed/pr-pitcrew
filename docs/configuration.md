@@ -98,6 +98,7 @@ Identical apart from the agent they run, the check name, and the slash command t
 | `fail-on` | string | `PITCREW_FAIL_ON`, then `high` | Severity from which the check fails. |
 | `output-language` | string | `PITCREW_OUTPUT_LANGUAGE`, then `English` | Language the agent writes in. |
 | `timeout-minutes` | number | `20` | Job timeout. |
+| `runs-on` | string | `ubuntu-latest` | Runner: one label, or a JSON array of labels. See [Your own runners](#your-own-runners). |
 
 | Secret | Required | Effect |
 | --- | --- | --- |
@@ -127,6 +128,7 @@ trigger with a reaction, and reactions on a pull request are governed by the iss
 | `output-language` | string | `PITCREW_OUTPUT_LANGUAGE`, then `English` | Language the agent writes in. |
 | `playwright-image` | string | `mcr.microsoft.com/playwright:v1.62.1-noble` | Container image with browsers, their libraries and the video encoder. |
 | `timeout-minutes` | number | `30` | Job timeout. |
+| `runs-on` | string | `ubuntu-latest` | Runner: one label, or a JSON array of labels. See [Your own runners](#your-own-runners). |
 
 | Secret | Required | Effect |
 | --- | --- | --- |
@@ -154,6 +156,41 @@ The job runs in a container, as `--user root`, with `shell: bash` as the default
 otherwise defaults to `sh`, and the first `set -o pipefail` ends a step with "Illegal option".
 
 Uploads the artifact `acceptance-proof`, labelled "Video and screenshots" in the comment.
+
+## Your own runners
+
+The reusable workflows run on `ubuntu-latest` unless the caller says otherwise:
+
+```yaml
+jobs:
+  bug-review:
+    uses: deyai-labs/pr-pitcrew/.github/workflows/bug-review.yml@v1
+    with:
+      runs-on: '["self-hosted", "linux"]'
+    secrets:
+      api-key: ${{ secrets.PITCREW_LLM_API_KEY }}
+```
+
+One label can be given as it is (`runs-on: ubuntu-24.04-arm`), several as a JSON array. The job
+waits for a runner that carries all of them.
+
+The runner needs bash, git, curl, coreutils and unzip - the last because the OpenCode installer
+unpacks its download with it. GitHub-hosted images have all of them. When no Node 20.10 or newer is
+on `PATH`, `actions/agent` installs Node 24 with `actions/setup-node`; a Node that is already there
+is used as it is.
+
+A self-hosted runner in your own organization works, even though this package lives in another one.
+GitHub's documentation reads narrower - a called workflow reaches the caller's self-hosted runners
+only when both belong to the same owner
+([GitHub Docs](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#self-hosted-runners)) -
+but a caller in another organization got its own self-hosted runner for these workflows when this
+was tested in September 2026. Should yours stay queued, call the engine from a job of your own and
+put the runner there - see [`actions/agent`](#actionsagent) below. That job takes over what the
+reusable workflow did: the trigger conditions, the permissions and a checkout with `fetch-depth: 0`.
+
+Before you point Pitcrew at a runner of your own, read [threat-model.md](threat-model.md), "Runs are
+assumed not to share a runner". Give it an ephemeral runner, and never a self-hosted one in a public
+repository: a pull request from a fork would run on your machine.
 
 ## `actions/agent`
 

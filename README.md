@@ -204,8 +204,8 @@ the pull request comments that reach it. See
 
 ## Requirements
 
-- GitHub Actions, Linux runners. Node 20.10 or newer, which every current runner image and the
-  Playwright container both have.
+- GitHub Actions, Linux runners: GitHub-hosted by default, or your own through the `runs-on` input
+  (see [`docs/configuration.md`](docs/configuration.md), "Your own runners").
 - An OpenAI-compatible endpoint and a key. Any provider: this package names no vendor, no host and
   no model.
 

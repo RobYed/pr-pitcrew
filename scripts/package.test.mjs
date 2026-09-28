@@ -236,6 +236,17 @@ describe('the agent action', () => {
     assert.ok(install, 'nothing installs the OpenCode runtime for the CLI path');
     assert.match(install, /VERSION: \$\{\{ inputs\.opencode-version \}\}/);
   });
+
+  it('finds a Node before the first script needs one, and keeps the runner\'s own', () => {
+    // A self-hosted runner may have no Node at all; the first script would then
+    // die with `node: command not found`. A Node that is already there wins.
+    const look = steps.findIndex(step => step.includes('name: Look for Node'));
+    const install = steps.findIndex(step => step.includes('uses: actions/setup-node@'));
+    const first = steps.findIndex(step => /run: node /.test(step));
+    assert.ok(look >= 0 && install >= 0, 'nothing provides Node on a runner without one');
+    assert.ok(look < install && install < first, 'Node is provided after the first script needs it');
+    assert.match(steps[install], /if: steps\.node\.outputs\.found != 'true'/, 'a Node the runner brings is overwritten');
+  });
 });
 
 describe('the acceptance test, which is the agent with a shell', () => {
@@ -274,6 +285,18 @@ describe('the acceptance test, which is the agent with a shell', () => {
   it('still refuses a public repository', () => {
     // The line that actually matters, and the one a variable can turn off.
     assert.match(workflow, /PITCREW_ACCEPTANCE_ALLOW_PUBLIC != 'true'/);
+  });
+});
+
+describe('the reusable workflows', () => {
+  it('let the caller choose the runner', () => {
+    // A runner fixed in here is a runner nobody who calls this can change:
+    // `runs-on` is not allowed next to `uses:` on the caller's side.
+    for (const name of ['bug-review.yml', 'security-review.yml', 'acceptance-test.yml']) {
+      const workflow = read('.github/workflows', name);
+      assert.match(workflow, /\n      runs-on:\n[\s\S]*?default: ubuntu-latest\n/, `${name}: no runs-on input`);
+      assert.match(workflow, /\n    runs-on: \$\{\{[^\n]*inputs\.runs-on[^\n]*\}\}\n/, `${name}: the job ignores the runs-on input`);
+    }
   });
 });
 
