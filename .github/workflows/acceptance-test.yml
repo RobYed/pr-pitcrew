@@ -56,6 +56,14 @@ on:
         type: number
         required: false
         default: 30
+      runs-on:
+        description: >-
+          Runner for the job - one label such as `ubuntu-latest`, or a JSON array
+          of labels such as `["self-hosted", "linux"]`. See docs/configuration.md,
+          "Your own runners".
+        type: string
+        required: false
+        default: ubuntu-latest
     secrets:
       api-key:
         description: Key for the OpenAI-compatible endpoint.
@@ -120,7 +128,10 @@ jobs:
        github.event.comment.user.type != 'Bot' &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
        contains(github.event.comment.body, '/acceptance'))
-    runs-on: ubuntu-latest
+    # One label as it is, or a JSON array for a runner that has to match all of
+    # them. Which runners this can reach is GitHub's rule, not this package's:
+    # see docs/configuration.md, "Your own runners".
+    runs-on: ${{ startsWith(inputs.runs-on, '[') && fromJSON(inputs.runs-on) || inputs.runs-on }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       contents: read
