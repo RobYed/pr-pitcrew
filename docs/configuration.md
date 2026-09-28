@@ -174,9 +174,10 @@ jobs:
 One label can be given as it is (`runs-on: ubuntu-24.04-arm`), several as a JSON array. The job
 waits for a runner that carries all of them.
 
-Nothing else has to be on the runner beyond what a GitHub-hosted image has in the same places: bash,
-git, curl and coreutils. When no Node 20.10 or newer is on `PATH`, `actions/agent` installs Node 24
-with `actions/setup-node`; a Node that is already there is used as it is.
+The runner needs bash, git, curl, coreutils and unzip - the last because the OpenCode installer
+unpacks its download with it. GitHub-hosted images have all of them. When no Node 20.10 or newer is
+on `PATH`, `actions/agent` installs Node 24 with `actions/setup-node`; a Node that is already there
+is used as it is.
 
 A self-hosted runner in your own organization works, even though this package lives in another one.
 GitHub's documentation reads narrower - a called workflow reaches the caller's self-hosted runners
