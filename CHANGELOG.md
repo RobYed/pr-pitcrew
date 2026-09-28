@@ -11,9 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The reusable workflows take a `runs-on` input.** One label or a JSON array of labels, default
   `ubuntu-latest`, so a caller can pick a larger GitHub-hosted runner or a self-hosted one without
-  copying the workflow. GitHub lets a called workflow reach self-hosted runners only in its own
-  account; [`docs/configuration.md`](docs/configuration.md), "Your own runners", says what to do
-  from anywhere else.
+  copying the workflow. See [`docs/configuration.md`](docs/configuration.md), "Your own runners".
 - **`actions/agent` installs Node when the runner has none.** Its scripts need Node 20.10 or newer,
   which GitHub-hosted runners and the Playwright image bring and a self-hosted runner may not. A
   Node that is already on `PATH` is used as it is; otherwise the action installs Node 24.

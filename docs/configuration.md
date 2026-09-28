@@ -178,13 +178,14 @@ Nothing else has to be on the runner beyond what a GitHub-hosted image has in th
 git, curl and coreutils. When no Node 20.10 or newer is on `PATH`, `actions/agent` installs Node 24
 with `actions/setup-node`; a Node that is already there is used as it is.
 
-GitHub decides which runners a reusable workflow can reach, and the rule is narrow: a called workflow
-reaches the caller's **self-hosted** runners only when both belong to the same user or organization
-([GitHub Docs](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#self-hosted-runners)).
-For every other repository `runs-on` still chooses among GitHub-hosted runners, including larger
-ones. For a self-hosted runner, call the engine from a job of your own instead, and put the runner
-there - see [`actions/agent`](#actionsagent) below. That job takes over what the reusable workflow
-did: the trigger conditions, the permissions and a checkout with `fetch-depth: 0`.
+A self-hosted runner in your own organization works, even though this package lives in another one.
+GitHub's documentation reads narrower - a called workflow reaches the caller's self-hosted runners
+only when both belong to the same owner
+([GitHub Docs](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#self-hosted-runners)) -
+but a caller in another organization got its own self-hosted runner for these workflows when this
+was tested in September 2026. Should yours stay queued, call the engine from a job of your own and
+put the runner there - see [`actions/agent`](#actionsagent) below. That job takes over what the
+reusable workflow did: the trigger conditions, the permissions and a checkout with `fetch-depth: 0`.
 
 Before you point Pitcrew at a runner of your own, read [threat-model.md](threat-model.md), "Runs are
 assumed not to share a runner". Give it an ephemeral runner, and never a self-hosted one in a public
