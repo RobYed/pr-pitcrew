@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-28
+
 ### Added
 
 - **The reusable workflows take a `runs-on` input.** One label or a JSON array of labels, default
@@ -157,7 +159,8 @@ is no plan to remove it.
 Version `1.0.0` rather than `0.1.0`: the interface is the one that had been running in a
 private repository for weeks, and `@v1` is what the documentation references.
 
-[Unreleased]: https://github.com/deyai-labs/pr-pitcrew/compare/v1.2.2...HEAD
+[Unreleased]: https://github.com/deyai-labs/pr-pitcrew/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/deyai-labs/pr-pitcrew/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/deyai-labs/pr-pitcrew/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/deyai-labs/pr-pitcrew/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/deyai-labs/pr-pitcrew/compare/v1.1.0...v1.2.0
