@@ -109,6 +109,20 @@ repository, fork pull requests can reach self-hosted runners.
 
 Do not use the workflow token to push. Its pushes start no workflow, so no review would run.
 
+### Test a branch before it is merged
+
+The caller can use the reusable workflow from any branch of `pr-pitcrew`. Put the branch name after
+`@` in `uses:` and in `harness-ref`:
+
+```yaml
+uses: deyai-labs/pr-pitcrew/.github/workflows/labs-issue-implementer.yml@my-branch
+with:
+  harness-ref: my-branch
+```
+
+The caller itself must be on the default branch of the calling repository. GitHub starts `issues`
+and `workflow_run` only from that version.
+
 Inputs of the reusable workflow: `runs-on`, `timeout-minutes` (default 180), `reasoning-effort`
 (default `high`), `max-auto-rounds` (default 3), `output-language`, `harness-ref` (default `main`).
 

@@ -27,8 +27,12 @@ permissions:
 
 jobs:
   implementer:
+    # The ref after `@` picks the workflow; `harness-ref` picks the scripts and
+    # the prompt. Keep both the same. To test a branch of pr-pitcrew before it
+    # is merged, put the branch name in both places.
     uses: deyai-labs/pr-pitcrew/.github/workflows/labs-issue-implementer.yml@main
     with:
+      harness-ref: main
       runs-on: fireactions-light
       timeout-minutes: 180
       reasoning-effort: high
