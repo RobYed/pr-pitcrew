@@ -21,7 +21,7 @@
  *
  * Environment: GITHUB_TOKEN (the app token), NOTICE_TOKEN, GITHUB_REPOSITORY,
  * GITHUB_SERVER_URL, MODE, ISSUE, PR, BRANCH, BASE_BRANCH, SINCE, TRIGGER,
- * ROUND, RESULT_DIR, IMPLEMENT_RESULT, RUN_URL, and APP_SLUG when the token is
+ * ROUND, PREV_SINCE, RESULT_DIR, IMPLEMENT_RESULT, RUN_URL, and APP_SLUG when the token is
  * an app's.
  */
 
@@ -36,6 +36,7 @@ import {
   pullRequestBody,
   roundComment,
   roundMarker,
+  stripMarkers,
 } from './lib.mjs';
 
 const env = process.env;
@@ -73,9 +74,19 @@ if (env.IMPLEMENT_RESULT !== 'success' || patch === null) {
   await giveUp(`The agent's job ended with "${env.IMPLEMENT_RESULT}" and left no usable result.`);
 }
 
-const summary = (read('summary.md') ?? '').trim();
+// Model output. HTML comments go: a marker in here would otherwise sit next to
+// the real one, and the snapshot decides what is ever handled again.
+const summary = stripMarkers(read('summary.md') ?? '');
 const stopped = status === 'stopped';
-const marker = roundMarker({ round, trigger: env.TRIGGER, since: env.SINCE });
+
+// A feedback round that ran out of time handled only part of its task. Its
+// marker repeats the previous snapshot, so that task stays open, and the round
+// comment wakes the next round to finish it. An issue round has no feedback to
+// keep open; its pull request carries the warning.
+const marker =
+  stopped && mode === 'feedback'
+    ? roundMarker({ round, trigger: 'stopped', since: env.PREV_SINCE || new Date(0).toISOString() })
+    : roundMarker({ round, trigger: env.TRIGGER, since: env.SINCE });
 
 const refused = forbiddenPaths(pathsFromPatch(patch));
 if (refused.length) {

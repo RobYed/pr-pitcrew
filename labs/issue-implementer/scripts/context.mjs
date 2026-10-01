@@ -147,7 +147,12 @@ async function fromPullRequest() {
   if (!items.length) skip(`no open feedback on #${number} since ${last?.since ?? 'the start'}`);
 
   const human = items.some(item => item.human);
-  if (!human && trailingBotRounds(rounds) >= maxAutoRounds) {
+  // A round that ran out of time leaves its feedback open and wakes the next
+  // one. Feedback from a person is then still open, so it cannot be what
+  // stops the count; otherwise a task too big for the time budget would run
+  // round after round.
+  const automatic = !human || last?.trigger === 'stopped';
+  if (automatic && trailingBotRounds(rounds) >= maxAutoRounds) {
     // Said once, as a round of its own. Its snapshot covers the findings it
     // declined, so the next wake-up does not say it again.
     if (last?.trigger !== 'limit') {
@@ -157,8 +162,9 @@ async function fromPullRequest() {
           body: [
             `### Issue implementer paused`,
             '',
-            `The review bots asked for ${maxAutoRounds} rounds in a row. The implementer stops here, so that it and the`,
-            'reviewers do not trade commits without end. Comment on this pull request to start the next round.',
+            `${maxAutoRounds} rounds in a row ran without a person asking (review findings, or rounds that ran out of`,
+            'time). The implementer stops here, so that it does not trade commits without end. Comment on this pull',
+            'request to start the next round, and repeat there what is still open.',
             '',
             roundMarker({ round: (last?.round ?? 0) + 1, trigger: 'limit', since }),
           ].join('\n'),
@@ -184,6 +190,9 @@ async function fromPullRequest() {
     branch: pr.head.ref,
     'base-sha': pr.head.sha,
     since,
+    // The snapshot this round started from. A round that runs out of time
+    // writes it again, so the feedback it did not finish stays open.
+    'prev-since': last?.since ?? '',
     trigger: human ? 'human' : 'bot',
     round: (last?.round ?? 0) + 1,
   });

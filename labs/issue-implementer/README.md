@@ -60,8 +60,15 @@ the open feedback:
 A round comment from the implementer records a snapshot time. Feedback after that time is open.
 Feedback written during a round goes into the next round.
 
-Rounds that only review bots asked for stop after `max-auto-rounds` (default 3) in a row. The
-implementer then posts one notice. A comment from a person starts the next round.
+A round that runs out of time pushes what it has. Its comment repeats the previous snapshot, so its
+feedback stays open, and the comment wakes the next round to continue.
+
+Rounds that run without a person asking (only review findings, or a round that ran out of time)
+stop after `max-auto-rounds` (default 3) in a row. The implementer then posts one notice. A comment
+from a person starts the next round.
+
+The agent's summary goes into comments, but without HTML comments. Only the last round marker in a
+comment counts, and the script writes it after the summary.
 
 A failed round posts a notice with the workflow token. That notice wakes nothing, so a failure
 does not repeat without end. The feedback stays open for the next wake-up.

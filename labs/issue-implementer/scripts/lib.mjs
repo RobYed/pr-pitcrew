@@ -18,16 +18,19 @@
 export const BRANCH_PREFIX = 'pitcrew/issue-';
 export const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 
-const ROUND = /<!-- pitcrew:implementer:round ([^>]*?) -->/;
+const ROUND = /<!-- pitcrew:implementer:round ([^>]*?) -->/g;
 const FINDING = /<!-- (?:pitcrew:finding|opencode-review-finding) -->/;
 
 export function roundMarker({ round, trigger, since }) {
   return `<!-- pitcrew:implementer:round n=${round} trigger=${trigger} since=${since} -->`;
 }
 
-/** `{ round, trigger, since }` from a body, or null. */
+/**
+ * `{ round, trigger, since }` from a body, or null. The *last* marker counts:
+ * the scripts write theirs at the end, after any text a model wrote.
+ */
 export function parseRoundMarker(body) {
-  const match = ROUND.exec(String(body ?? ''));
+  const match = [...String(body ?? '').matchAll(ROUND)].at(-1);
   if (!match) return null;
   const fields = Object.fromEntries(
     match[1]
@@ -66,12 +69,16 @@ export function roundsOf(pr, comments, { self } = {}) {
   return rounds.sort((a, b) => a.since.localeCompare(b.since));
 }
 
-/** Rounds at the end that only bots asked for. A human round resets the count. */
+/**
+ * Rounds at the end that ran without a person asking: rounds only bots asked
+ * for, and rounds that ran out of time and woke the next one themselves. A
+ * round a person asked for resets the count.
+ */
 export function trailingBotRounds(rounds) {
   let count = 0;
   for (const round of [...rounds].reverse()) {
     if (round.trigger === 'human' || round.trigger === 'issue') break;
-    if (round.trigger === 'bot') count++;
+    if (round.trigger === 'bot' || round.trigger === 'stopped') count++;
   }
   return count;
 }

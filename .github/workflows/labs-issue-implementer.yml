@@ -96,6 +96,7 @@ jobs:
       branch: ${{ steps.context.outputs.branch }}
       base-sha: ${{ steps.context.outputs.base-sha }}
       since: ${{ steps.context.outputs.since }}
+      prev-since: ${{ steps.context.outputs.prev-since }}
       trigger: ${{ steps.context.outputs.trigger }}
       round: ${{ steps.context.outputs.round }}
     steps:
@@ -335,6 +336,7 @@ jobs:
           BRANCH: ${{ needs.context.outputs.branch }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           SINCE: ${{ needs.context.outputs.since }}
+          PREV_SINCE: ${{ needs.context.outputs.prev-since }}
           TRIGGER: ${{ needs.context.outputs.trigger }}
           ROUND: ${{ needs.context.outputs.round }}
           RESULT_DIR: ${{ runner.temp }}/result
